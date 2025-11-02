@@ -3,7 +3,7 @@ from Chunk.ChunkFactory import create_chunk_method
 from Common.Utils import mdhash_id
 from Common.Logger import logger
 from Schema.ChunkSchema import TextChunk
-from Core.Storage.ChunkKVStorage import ChunkKVStorage
+from Storage.ChunkKVStorage import ChunkKVStorage
 from typing import List, Union
 
 
