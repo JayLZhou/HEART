@@ -8,7 +8,7 @@ from shutil import copyfile
 from Data.QueryDataset import RAGQueryDataset
 import pandas as pd
 from Utils.Evaluation import Evaluator
-
+from Common.Utils import welcome_message
 
 
 def check_dirs(opt):
@@ -58,7 +58,7 @@ def wrapper_tuning(opt):
     pass
 
 if __name__ == "__main__":
-
+    welcome_message()
     parser = argparse.ArgumentParser()
     parser.add_argument("-opt", type=str, help="Path to option YMAL file.")
     parser.add_argument("-dataset_name", type=str, help="Name of the dataset.")

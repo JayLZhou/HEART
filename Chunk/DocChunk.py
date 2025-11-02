@@ -5,14 +5,14 @@ from Common.Logger import logger
 from Schema.ChunkSchema import TextChunk
 from Storage.ChunkKVStorage import ChunkKVStorage
 from typing import List, Union
-
+import tiktoken
 
 class DocChunk:
     def __init__(self, config, token_model, namesapce):
         self.config = config
         self.chunk_method = create_chunk_method(self.config.chunk_method)
         self._chunk = ChunkKVStorage(namespace=namesapce)
-        self.token_model = token_model
+        self.token_model = tiktoken.encoding_for_model(token_model)
 
     @property
     def namespace(self):

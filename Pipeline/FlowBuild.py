@@ -1,66 +1,24 @@
+from Index import get_index, get_index_config
+from Storage.NameSpace import Workspace
+from Chunk.DocChunk import DocChunk
 
 class FlowBuilder:
     """Builds different types of flows based on configuration."""
     
     def __init__(self, study_config: StudyConfig):
         self.study_config = study_config
-
+        self.workspace = Workspace(self.config.working_dir, self.config.index_name)
+        self.doc_chunk = DocChunk(self.config.chunk, self.config.token_model, self.workspace.make_for("chunk_storage"))
+        self.chunk_vdb = get_index(
+                get_index_config(self.config, persist_path=self.chunk_vdb_namespace.get_save_path()))
+        
     
-    def _create_example_retriever(self, params: T.Dict[str, T.Any], embedding_model) -> T.Callable:
-        """Create the actual example retriever."""
-        assert embedding_model, "No embedding model for dynamic few-shot prompting"
-        logger.info("Building few-shot retriever")
-        
-        dataset_iter = self.study_config.dataset.iter_examples(partition="train")
-        logger.info("Getting few-shot examples from dataset")
-        
-        if self.study_config.toy_mode:
-            dataset_iter = itertools.islice(dataset_iter, 20)
-        
-        few_shot_nodes = []
-        for pair in dataset_iter:
-            line = f"{{'query': '''{pair.question}''', 'response': '''{pair.answer}'''}}"
-            few_shot_nodes.append(TextNode(text=line))
-        
-        if not isinstance(embedding_model, HFEndpointEmbeddings):
-            embedding_model.reset_timeouts(total_chunks=len(few_shot_nodes))
-        
-        logger.info("Building few-shot retriever index")
-        few_shot_index = VectorStoreIndex(nodes=few_shot_nodes, embed_model=embedding_model)
-        logger.info("Built few-shot retriever index")
-        
-        few_shot_retriever = few_shot_index.as_retriever(
-            similarity_top_k=params["few_shot_top_k"], 
-            similarity_threshold=None
-        )
 
-        def get_qa_examples(query_str, **kwargs):
-            _ = kwargs  # Mark as used
-            return self._get_examples(few_shot_retriever, query_str)
+    def build_indexing(self):
+        self.doc_chunk.build_chunks(docs)
+        self.chunk_vdb.insert()
+        pass
 
-        return get_qa_examples
-    
-    def _get_examples(self, example_retriever: BaseRetriever, query_str: str) -> str:
-        """Extract examples from retriever results."""
-        retrieved_nodes: T.List[NodeWithScore] = example_retriever.retrieve(query_str)
-        result_strs = []
-        
-        for n in retrieved_nodes:
-            try:
-                raw_dict = ast.literal_eval(n.text)
-                query = raw_dict["query"]
-                response = raw_dict["response"]
-                result_str = dedent(f"""\
-                    Question: {query}
-                    Answer: {response}""")
-                result_strs.append(result_str)
-            except SyntaxError as exc:
-                logger.warning("Converting example to dictionary failed: %s", exc)
-                result_strs.append(n.text)
-   
-            
-        return "\n\n".join(result_strs)
-    
     def build_flow(self, params: T.Dict[str, T.Any]) -> Flow:
         """Build the appropriate flow based on parameters."""
         from hammer.llm import get_llm
@@ -79,8 +37,7 @@ class FlowBuilder:
         enforce_full_evaluation = params.get("enforce_full_evaluation", False)
         
         
-        # Build few-shot examples if needed
-        get_qa_examples = self.build_few_shot_retriever(params)
+
         
         # Build appropriate flow type
         template_name = params["template_name"]
