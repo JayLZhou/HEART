@@ -5,20 +5,6 @@ class FlowBuilder:
     def __init__(self, study_config: StudyConfig):
         self.study_config = study_config
 
-    def build_few_shot_retriever(self, params: T.Dict[str, T.Any]) -> T.Optional[T.Callable]:
-        """Build few-shot example retriever if enabled."""
-        if not self.study_config.search_space.is_few_shot(params):
-            return None
-        
-        few_shot_embedding_model_name = params["few_shot_embedding_model"]
-        few_shot_embedding_model, _ = get_embedding_model(
-            few_shot_embedding_model_name,
-            timeout_config=self.study_config.timeouts,
-            device=self.study_config.optimization.embedding_device,
-            use_hf_endpoint_models=self.study_config.optimization.use_hf_embedding_models,
-        )
-        
-        return self._create_example_retriever(params, few_shot_embedding_model)
     
     def _create_example_retriever(self, params: T.Dict[str, T.Any], embedding_model) -> T.Callable:
         """Create the actual example retriever."""

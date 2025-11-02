@@ -71,9 +71,10 @@ if __name__ == "__main__":
     query_dataset = RAGQueryDataset(
         data_dir=os.path.join(opt.data_root, opt.dataset_name)
     )
+
+    # Offline indexing
     corpus = query_dataset.get_corpus()
  
-
     digimon.insert(corpus)
 
     save_path = wrapper_query(query_dataset, digimon, result_dir)
