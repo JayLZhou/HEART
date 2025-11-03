@@ -57,10 +57,9 @@ from hammer.rerankers.enhanced_factory import build_reranker_postprocessor
 class RAGFlow():
     response_synthesizer_llm: LLM | FunctionCallingLLM
     template: str | None = None
-    get_examples: T.Callable | None = None
-    name: str = "Generator Flow"
+    name: str = "RAG Flow"
     params: dict | None = None
-    enforce_full_evaluation: bool = False
+
 
     def __repr__(self):
         return f"{self.name}: {self.params}"
@@ -133,7 +132,8 @@ class RAGFlow():
         assert hasattr(self.query_engine, "aretrieve"), (
             f"{self.query_engine} does not have 'aretrieve' method"
         )
-        return await self.query_engine.aretrieve(QueryBundle(query))
+
+        return await self.query_engine.aret rieve(QueryBundle(query))
 
     def _generate(
         self, query: str, invocation_id: str
