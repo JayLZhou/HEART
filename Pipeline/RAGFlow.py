@@ -133,7 +133,7 @@ class RAGFlow():
             f"{self.query_engine} does not have 'aretrieve' method"
         )
 
-        return await self.query_engine.aret rieve(QueryBundle(query))
+        return await self.query_engine.aretrieve(QueryBundle(query))
 
     def _generate(
         self, query: str, invocation_id: str

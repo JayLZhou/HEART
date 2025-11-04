@@ -9,7 +9,18 @@ from Data.QueryDataset import RAGQueryDataset
 import pandas as pd
 from Utils.Evaluation import Evaluator
 from Common.Utils import welcome_message
+from tqdm import tqdm
+from Tuner.OptunaTuner import get_study, objective
+from Common.Logger import logger
+import optuna
 
+parser = argparse.ArgumentParser()
+parser.add_argument("-opt", type=str, help="Path to option YMAL file.")
+parser.add_argument("-dataset_name", type=str, help="Name of the dataset.")
+args = parser.parse_args()
+
+opt = Config.parse(Path(args.opt), dataset_name=args.dataset_name)
+flow = GraphRAG(config=opt)
 
 def check_dirs(opt):
     # For each query, save the results in a separate directory
@@ -54,18 +65,34 @@ async def wrapper_evaluation(path, opt, result_dir):
         f.write(str(res_dict))
 
 
-def wrapper_tuning(opt):
-    pass
+def wrapper_tuning(opt, study_config, components, num_trials):
+    study = get_study(study_config)
+    logger.info("Starting sequential optimization")
+
+    results = []
+    
+    for i in tqdm(range(num_trials), desc="Running trials"):
+        logger.info("Running trial %d/%d", i+1, num_trials)
+        try:
+            trial = study.ask()
+            obj_1, obj_2 = objective(trial, study_config, components)
+            study.tell(trial, [obj_1, obj_2])
+            results.append({
+                study_config.optimization.objective_1_name: obj_1,
+                study_config.optimization.objective_2_name: obj_2,
+            })
+        except optuna.TrialPruned:
+            logger.warning("Trial %d was pruned", i+1)
+            continue
+        except Exception as e:
+            logger.error(f"Trial %d failed with error: {str(e)}", i+1)
+            continue
+    
+    return study
 
 if __name__ == "__main__":
     welcome_message()
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-opt", type=str, help="Path to option YMAL file.")
-    parser.add_argument("-dataset_name", type=str, help="Name of the dataset.")
-    args = parser.parse_args()
-
-    opt = Config.parse(Path(args.opt), dataset_name=args.dataset_name)
-    flow = GraphRAG(config=opt)
+  
     result_dir = check_dirs(opt)
 
     query_dataset = RAGQueryDataset(
