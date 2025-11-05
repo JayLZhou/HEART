@@ -1,7 +1,6 @@
 import faiss
 import os
 from Common.BaseFactory import ConfigBasedFactory
-from Index.ColBertIndex import ColBertIndex
 from Index.Schema import (
     BaseIndexConfig,
     VectorIndexConfig,

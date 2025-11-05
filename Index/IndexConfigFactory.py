@@ -1,8 +1,8 @@
 """
 Index Config Factory.
 """
-from Core.Index import get_rag_embedding
-from Core.Index.Schema import (
+from Index import get_rag_embedding
+from Index.Schema import (
     VectorIndexConfig,
     ColBertIndexConfig,
     FAISSIndexConfig

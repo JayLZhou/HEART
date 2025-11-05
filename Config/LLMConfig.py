@@ -5,14 +5,17 @@ from typing import Optional
 from pydantic import BaseModel
 
 
-class LLMType(str, Enum):
-    """LLM type enumeration"""
+class LLMType(Enum):
     OPENAI = "openai"
-    AZURE = "azure"
-    ANTHROPIC = "anthropic"
-    OLLAMA = "ollama"
-    HUGGINGFACE = "huggingface"
-    VLLM = "vllm"
+    FIREWORKS = "fireworks"
+    OPEN_LLM = "open_llm"
+    OLLAMA = "ollama"  # /chat at ollama api
+    OLLAMA_GENERATE = "ollama.generate"  # /generate at ollama api
+    OLLAMA_EMBEDDINGS = "ollama.embeddings"  # /embeddings at ollama api
+    OLLAMA_EMBED = "ollama.embed"  # /embed at ollama api
+    OPENROUTER = "openrouter"
+    BEDROCK = "bedrock"
+    ARK = "ark"  # https://www.volcengine.com/docs/82379/1263482#python-sdk
 
 
 class LLMConfig(BaseModel):

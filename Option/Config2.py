@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Optional
 from pydantic import BaseModel
 from Config import *
-from Common.Constants import CONFIG_ROOT, GRAPHRAG_ROOT
+from Common.Constants import CONFIG_ROOT, PROJECT_ROOT
 from Utils.YamlModel import YamlModel
 
 
@@ -81,7 +81,7 @@ class Config(WorkingParams, YamlModel):
         opt = [parse(_path)]
 
         default_config_paths: List[Path] = [
-            GRAPHRAG_ROOT / "Option/Config2.yaml",
+            PROJECT_ROOT / "Option/Config2.yaml",
             CONFIG_ROOT / "Config2.yaml",
         ]
         opt += [Config.read_yaml(path) for path in default_config_paths]
@@ -98,7 +98,7 @@ class Config(WorkingParams, YamlModel):
         - Inside default_config_paths, the latter one overwrites the former one
         """
         default_config_paths: List[Path] = [
-            GRAPHRAG_ROOT / "Option/Config2.yaml",
+            PROJECT_ROOT / "Option/Config2.yaml",
             CONFIG_ROOT / "Config2.yaml",
         ]
 

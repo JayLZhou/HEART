@@ -8,7 +8,7 @@
 """
 
 from Config.LLMConfig import LLMConfig, LLMType
-from Core.Provider.BaseLLM import BaseLLM
+from Provider.BaseLLM import BaseLLM
 
 
 class LLMProviderRegistry:

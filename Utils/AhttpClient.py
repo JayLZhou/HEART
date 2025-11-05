@@ -1,14 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# @Desc   : pure async http_client
+# @Desc   : pure sync http_client
 
 from typing import Any, Mapping, Optional, Union
 
-import aiohttp
-from aiohttp.client import DEFAULT_TIMEOUT
+import requests
 
 
-async def apost(
+def apost(
     url: str,
     params: Optional[Mapping[str, str]] = None,
     json: Any = None,
@@ -16,34 +15,33 @@ async def apost(
     headers: Optional[dict] = None,
     as_json: bool = False,
     encoding: str = "utf-8",
-    timeout: int = DEFAULT_TIMEOUT.total,
+    timeout: int = 30,
 ) -> Union[str, dict]:
-    async with aiohttp.ClientSession() as session:
-        async with session.post(url=url, params=params, json=json, data=data, headers=headers, timeout=timeout) as resp:
-            if as_json:
-                data = await resp.json()
-            else:
-                data = await resp.read()
-                data = data.decode(encoding)
-    return data
+    resp = requests.post(url=url, params=params, json=json, data=data, headers=headers, timeout=timeout)
+    resp.raise_for_status()
+    if as_json:
+        return resp.json()
+    else:
+        return resp.content.decode(encoding)
 
 
-async def apost_stream(
+def apost_stream(
     url: str,
     params: Optional[Mapping[str, str]] = None,
     json: Any = None,
     data: Any = None,
     headers: Optional[dict] = None,
     encoding: str = "utf-8",
-    timeout: int = DEFAULT_TIMEOUT.total,
+    timeout: int = 30,
 ) -> Any:
     """
     usage:
         result = astream(url="xx")
-        async for line in result:
+        for line in result:
             deal_with(line)
     """
-    async with aiohttp.ClientSession() as session:
-        async with session.post(url=url, params=params, json=json, data=data, headers=headers, timeout=timeout) as resp:
-            async for line in resp.content:
-                yield line.decode(encoding)
+    resp = requests.post(url=url, params=params, json=json, data=data, headers=headers, timeout=timeout, stream=True)
+    resp.raise_for_status()
+    for line in resp.iter_lines():
+        if line:
+            yield line.decode(encoding)

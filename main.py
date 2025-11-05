@@ -1,18 +1,18 @@
-from Core.GraphRAG import GraphRAG
+
 from Option.Config2 import Config
 import argparse
 import os
-import asyncio
 from pathlib import Path
 from shutil import copyfile
-from Data.QueryDataset import RAGQueryDataset
+from Data.DataLoader import RAGDataset
 import pandas as pd
-from Utils.Evaluation import Evaluator
+# from Utils.Evaluation import Evaluator
 from Common.Utils import welcome_message
 from tqdm import tqdm
-from Tuner.OptunaTuner import get_study, objective
+# from Tuner.OptunaTuner import get_study, objective
 from Common.Logger import logger
 import optuna
+from Pipeline.FlowBuild import FlowBuilder
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-opt", type=str, help="Path to option YMAL file.")
@@ -20,7 +20,7 @@ parser.add_argument("-dataset_name", type=str, help="Name of the dataset.")
 args = parser.parse_args()
 
 opt = Config.parse(Path(args.opt), dataset_name=args.dataset_name)
-flow = GraphRAG(config=opt)
+flow = FlowBuilder(config=opt)
 
 def check_dirs(opt):
     # For each query, save the results in a separate directory
@@ -39,27 +39,11 @@ def check_dirs(opt):
     return result_dir
 
 
-def wrapper_query(query_dataset, digimon, result_dir):
-    all_res = []
-
-    dataset_len = len(query_dataset)
-    dataset_len = 10
-    
-    for _, i in enumerate(range(dataset_len)):
-        query = query_dataset[i]
-        res = asyncio.run(digimon.query(query["question"]))
-        query["output"] = res
-        all_res.append(query)
-
-    all_res_df = pd.DataFrame(all_res)
-    save_path = os.path.join(result_dir, "results.json")
-    all_res_df.to_json(save_path, orient="records", lines=True)
-    return save_path
 
 
-async def wrapper_evaluation(path, opt, result_dir):
+def wrapper_evaluation(path, opt, result_dir):
     eval = Evaluator(path, opt.dataset_name)
-    res_dict = await eval.evaluate()
+    res_dict = eval.evaluate()
     save_path = os.path.join(result_dir, "metrics.json")
     with open(save_path, "w") as f:
         f.write(str(res_dict))
@@ -95,16 +79,14 @@ if __name__ == "__main__":
   
     result_dir = check_dirs(opt)
 
-    query_dataset = RAGQueryDataset(
+    dataset = RAGDataset(
         data_dir=os.path.join(opt.data_root, opt.dataset_name)
     )
 
     # Offline indexing
-    corpus = query_dataset.get_corpus()
+    corpus = dataset.get_corpus()
  
-    digimon.insert(corpus)
+    flow.build_indexing(corpus)
 
-    save_path = wrapper_query(query_dataset, digimon, result_dir)
 
-    asyncio.run(wrapper_evaluation(save_path, opt, result_dir))
 

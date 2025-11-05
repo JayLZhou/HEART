@@ -5,7 +5,7 @@ from Chunk.DocChunk import DocChunk
 from Common.ContextMixin import ContextMixin
 from Option.Config2 import Config
 from pydantic import BaseModel
-from Pipeline.RAGFlow import RAGFlow
+# from Pipeline.RAGFlow import RAGFlow
 
 class FlowBuilder(ContextMixin, BaseModel):
     """Builds different types of flows based on configuration."""
@@ -23,8 +23,8 @@ class FlowBuilder(ContextMixin, BaseModel):
     def build_indexing(self, corpus):
      
         self.doc_chunk.build_chunks(corpus)
-        self.chunk_vdb.insert()
-        rag_retriever, rag_docstore = build_rag_retriever(self.config, params)
+        self.chunk_vdb.build_index(self.doc_chunk.get_chunks(), [], self.config.force_rebuild)
+
 
     def build_flow(self, params: T.Dict[str, T.Any]) -> RAGFlow:
         """Build the appropriate flow based on parameters.

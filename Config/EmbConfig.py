@@ -5,13 +5,10 @@ from typing import Optional
 from pydantic import BaseModel
 
 
-class EmbeddingType(str, Enum):
-    """Embedding type enumeration"""
+class EmbeddingType(Enum):
     OPENAI = "openai"
-    HUGGINGFACE = "huggingface"
-    SENTENCE_TRANSFORMERS = "sentence_transformers"
+    HF = "hf"
     OLLAMA = "ollama"
-
 
 class EmbeddingConfig(BaseModel):
     """Embedding configuration"""

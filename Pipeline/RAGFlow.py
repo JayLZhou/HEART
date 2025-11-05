@@ -4,26 +4,15 @@ from dataclasses import asdict, dataclass, field
 from enum import Enum
 from functools import cached_property
 import llama_index.core.instrumentation as instrument
-from llama_index.agent.introspective import (
-    IntrospectiveAgentWorker,
-    ToolInteractiveReflectionAgentWorker,
-)
-from llama_index.agent.introspective.reflective.tool_interactive_reflection import (
-    StoppingCallable,
-)
-from llama_index.agent.lats import LATSAgentWorker
+
+
 from llama_index.core import (
     PromptTemplate,
     QueryBundle,
     Response,
     get_response_synthesizer,
 )
-from llama_index.core.agent import (
-    AgentChatResponse,
-    AgentRunner,
-    FunctionCallingAgentWorker,
-    ReActAgent,
-)
+
 from llama_index.core.agent.react.formatter import ReActChatFormatter
 from llama_index.core.indices.query.query_transform.base import (
     HyDEQueryTransform,
@@ -128,12 +117,12 @@ class RAGFlow():
     def retrieve(self, query: str) -> T.List[NodeWithScore]:
         return self.query_engine.retrieve(QueryBundle(query))
 
-    async def aretrieve(self, query: str) -> T.List[NodeWithScore]:
+    def aretrieve(self, query: str) -> T.List[NodeWithScore]:
         assert hasattr(self.query_engine, "aretrieve"), (
             f"{self.query_engine} does not have 'aretrieve' method"
         )
 
-        return await self.query_engine.aretrieve(QueryBundle(query))
+        return self.query_engine.aretrieve(QueryBundle(query))
 
     def _generate(
         self, query: str, invocation_id: str
@@ -153,11 +142,11 @@ class RAGFlow():
         duration = time.perf_counter() - start_time
         return completion_response, duration
 
-    async def _agenerate(
+    def _agenerate(
         self, query: str, invocation_id: str
     ) -> T.Tuple[CompletionResponse, float]:
         start_time = time.perf_counter()
-        response = await self.query_engine.aquery(query)
+        response = self.query_engine.aquery(query)
         assert isinstance(response, Response), (
             f"Expected Response, got {type(response)=}"
         )

@@ -1,8 +1,8 @@
 from typing import Any
-from Core.Common.Utils import mdhash_id
+from Common.Utils import mdhash_id
 from collections import defaultdict
 
-from Core.Schema.ChunkSchema import TextChunk
+from Schema.ChunkSchema import TextChunk
 
 
 class ChunkingFactory:

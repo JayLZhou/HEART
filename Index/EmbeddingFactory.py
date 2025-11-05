@@ -17,7 +17,7 @@ except ImportError:
     print("HuggingFaceEmbedding not found, please install it by `pip install huggingface_hub`")
 from Config.EmbConfig import EmbeddingType
 from Config.LLMConfig import LLMType
-from Core.Common.BaseFactory import GenericFactory
+from Common.BaseFactory import GenericFactory
 from Option.Config2 import Config
 
 class RAGEmbeddingFactory(GenericFactory):
