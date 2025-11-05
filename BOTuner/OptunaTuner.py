@@ -6,7 +6,6 @@ import numpy as np
 from datetime import datetime, timezone
 from Config import StudyConfig
 from Common.Logger import logger
-from Common.Utils import user_confirm_delete, recreate_with_completed_trials
 from BOTuner.HierarchicalTPE import HierarchicalTPESampler
 from BOTuner.BasicTuner import BasicTuner
 
@@ -39,7 +38,7 @@ class OptunaTuner(BasicTuner):
                 "Reusing study '%s' or creating new one", study_name
             )
             if self.study_config.recreate_study:
-                recreate_with_completed_trials(self.study_config, storage)
+                self.recreate_with_completed_trials(self.study_config, storage)
         elif user_confirm_delete(self.study_config):
             try:
                 optuna.delete_study(study_name=study_name, storage=storage)
@@ -147,6 +146,78 @@ class OptunaTuner(BasicTuner):
             )
 
         return obj1, obj2
+
+    def user_confirm_delete(study_config: StudyConfig) -> bool:
+    """Confirm deletion of study"""
+        study_name = study_config.name
+
+        if cfg.optuna.noconfirm:
+            logger.warning("noconfirm set; going to delete %s if it exists", study_name)
+            return True
+
+        try:
+            confirm = input(
+                f"Are you sure you want to overwrite study {study_name} if it exists? yes/no\n>>> "
+            )
+            if confirm != "yes":
+                logger.warning(f"Cowardly refusing to delete study {study_name}")
+                return False
+            return True
+        except (OSError, EOFError):
+            # Running in background mode, automatically confirming study deletion
+            logger.warning("Running in background mode, automatically confirming study deletion for %s", study_name)
+            return True
+    def recreate_with_completed_trials(self,
+    study_config: StudyConfig,
+    storage: str | BaseStorage | None = None,
+    ):
+        study_name = study_config.name
+        storage = storage or cfg.database.get_optuna_storage()
+        try:
+            study: optuna.Study = optuna.load_study(study_name=study_name, storage=storage)
+        except KeyError:
+            logger.warning(
+                "Cannot recreate study '%s' because it does not exist", study_name
+            )
+            return
+        completed_trials = [
+            optuna.trial.create_trial(
+                state=optuna.trial.TrialState.COMPLETE,
+                values=t.values,
+                params=t.params,
+                distributions=t.distributions,
+                user_attrs=t.user_attrs,
+                system_attrs=t.system_attrs,
+                intermediate_values=t.intermediate_values,
+            )
+            for t in study.trials
+            if t.state == optuna.trial.TrialState.COMPLETE
+        ]
+        logger.info("Keeping %i completed trials", len(completed_trials))
+        logger.info("Deleting study '%s'", study_name)
+        optuna.delete_study(study_name=study_name, storage=storage)
+        logger.info("Recreating study '%s'", study_name)
+        sampler = self.get_sampler(study_config)
+        new_study = optuna.create_study(
+            storage=storage,
+            sampler=sampler,
+            directions=["maximize", "minimize"],
+            study_name=study_name,
+            load_if_exists=False,
+        )
+        new_study.add_trials(completed_trials)
+        logger.info("Recreated study '%s' successfully", study_name)
+    def trial_exists(self,
+    study_name: str,
+    params: T.Dict[str, T.Any],
+    storage: str | BaseStorage | None = None,) -> bool:
+        storage = storage or self.study_config.database.get_optuna_storage()
+        logger.debug("Loading '%s' from storage: %s", study_name, storage)
+        study = optuna.load_study(study_name=study_name, storage=storage)
+        for trial in study.get_trials():
+            if params == trial.params:
+                return True
+        return False
 
 # 兼容性函数包装器，用于向后兼容
 def get_study(study_config: StudyConfig) -> optuna.Study:
