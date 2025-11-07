@@ -20,7 +20,10 @@ parser.add_argument("-dataset_name", type=str, help="Name of the dataset.")
 args = parser.parse_args()
 
 opt = Config.parse(Path(args.opt), dataset_name=args.dataset_name)
-flow = FlowBuilder(config=opt)
+builder = FlowBuilder(config=opt)
+
+
+
 
 def check_dirs(opt):
     # For each query, save the results in a separate directory
@@ -41,16 +44,16 @@ def check_dirs(opt):
 
 
 
-def wrapper_evaluation(path, opt, result_dir):
-    eval = Evaluator(path, opt.dataset_name)
-    res_dict = eval.evaluate()
-    save_path = os.path.join(result_dir, "metrics.json")
-    with open(save_path, "w") as f:
-        f.write(str(res_dict))
+# def wrapper_evaluation(path, opt, result_dir):
+#     eval = Evaluator(path, opt.dataset_name)
+#     res_dict = eval.evaluate()
+#     save_path = os.path.join(result_dir, "metrics.json")
+#     with open(save_path, "w") as f:
+#         f.write(str(res_dict))
 
 
 def wrapper_tuning(opt, study_config, components, num_trials):
-    study = get_study(study_config)
+ 
     logger.info("Starting sequential optimization")
 
     results = []
@@ -86,7 +89,7 @@ if __name__ == "__main__":
     # Offline indexing
     corpus = dataset.get_corpus()
  
-    flow.build_indexing(corpus)
+    builder.build_indexing(corpus)
 
 
 
