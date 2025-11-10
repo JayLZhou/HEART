@@ -3,7 +3,7 @@ from pathlib import Path
 
 from loguru import logger
 from enum import Enum
-
+from typing import List
 Process_tickers = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
 
 
@@ -79,7 +79,7 @@ MESSAGE_ROUTE_CAUSE_BY = "cause_by"
 MESSAGE_META_ROLE = "role"
 MESSAGE_ROUTE_TO_ALL = "<all>"
 MESSAGE_ROUTE_TO_NONE = "<none>"
-
+NDIGITS = 4
 
 # Used for Medical-Graph-RAG like
 
@@ -97,3 +97,25 @@ g = int(hex_color[3:5], 16)
 b = int(hex_color[5:7], 16)
 ANSI_COLOR = f"\033[38;2;{r};{g};{b}m"
 TOKEN_TO_CHAR_RATIO = 4
+
+
+# Embedding models
+DEFAULT_EMBEDDING_MODELS: T.List[str] = list(
+    set(
+        [
+            "BAAI/bge-small-en-v1.5",  # first embedding model is the default
+            "BAAI/bge-large-en-v1.5",
+            "thenlper/gte-large",
+            "mixedbread-ai/mxbai-embed-large-v1",
+            "WhereIsAI/UAE-Large-V1",
+            "avsolatorio/GIST-large-Embedding-v0",
+            "w601sxs/b1ade-embed",
+            "Labib11/MUG-B-1.6",
+            "sentence-transformers/all-MiniLM-L12-v2",
+            "sentence-transformers/paraphrase-multilingual-mpnet-base-v2",
+            "BAAI/bge-base-en-v1.5",
+            "FinLang/finance-embeddings-investopedia",
+            "baconnier/Finance2_embedding_small_en-V1.5",
+        ]
+    )
+)

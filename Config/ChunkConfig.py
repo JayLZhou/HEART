@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-from typing import Optional
 from pydantic import BaseModel
 
 
@@ -44,6 +43,4 @@ class ChunkConfig(BaseModel):
     
     # Tokenizer
     tokenizer_model: str = "gpt-3.5-turbo"
-
-
 
