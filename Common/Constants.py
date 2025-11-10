@@ -4,6 +4,7 @@ from pathlib import Path
 from loguru import logger
 from enum import Enum
 from typing import List
+import typing as T
 Process_tickers = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
 
 
@@ -119,3 +120,11 @@ DEFAULT_EMBEDDING_MODELS: T.List[str] = list(
         ]
     )
 )
+
+
+TEMPLATE_NAMES = [
+    "default",  # first template is the default
+    "concise",
+    "CoT",
+    "finance-expert",
+]
