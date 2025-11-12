@@ -7,6 +7,23 @@ from typing import List
 import typing as T
 Process_tickers = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
 
+DEFAULT_LLMS: T.List[str] = list(
+    set(
+        [
+            "gpt-4o-mini",  # first LLM is the default
+            "anthropic-haiku-35",
+            "gemini-flash",
+            # "gemini-flash2",
+            # "gemini-pro",
+            # "llama-33-70B",   # not enough capacity
+            # "mistral-large",  # not enough capacity
+            # "phi-4",          # not enough capacity
+            # "anthropic-sonnet-35",
+            # "gpt-4o-std",
+            "o3-mini",
+        ]
+    )
+)
 
 Default_text_separator = [
     # Paragraph separators

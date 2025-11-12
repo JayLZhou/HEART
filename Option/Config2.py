@@ -46,9 +46,6 @@ class Config(WorkingParams, YamlModel):
   
     use_entity_link_chunk: bool = True  # Only set True for HippoRAG and FastGraphRAG
     
-    # Graph Config
-    graph: GraphConfig = GraphConfig()
-    
     # Retrieval Parameters
     retriever: RetrieverConfig = RetrieverConfig()
 

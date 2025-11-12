@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from Config.SearchSpace import *
+from Config.SearchSpaceMix import *
 import typing as T
 
 class TopK(BaseModel, SearchSpaceMixin):

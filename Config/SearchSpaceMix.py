@@ -13,8 +13,14 @@ from optuna.distributions import (
 from pydantic import ConfigDict
 from Common.Constants import NDIGITS, TEMPLATE_NAMES, DEFAULT_LLMS
 ParamDict = T.Dict[str, str | int | float | bool]
-from Common.Utils import get_dist_cardinality
+# from Common.Utils import get_dist_cardinality
 
+def get_dist_cardinality(min: int | float, max: int | float, step: int | float) -> int:
+    """Returns the cardinality of an integer or float distribution"""
+    assert min <= max
+    assert step > 0
+    return int((max - min) / step) + 1
+    
 class SearchSpaceMixin(ABC):
     """Common interface for all search space classes."""
 

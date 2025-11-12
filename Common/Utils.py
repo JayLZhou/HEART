@@ -176,9 +176,3 @@ def prase_json_from_response(response: str) -> dict:
         logger.info("JSON data successfully extracted.")
 
     return extracted_values
-
-def get_dist_cardinality(min: int | float, max: int | float, step: int | float) -> int:
-    """Returns the cardinality of an integer or float distribution"""
-    assert min <= max
-    assert step > 0
-    return int((max - min) / step) + 1

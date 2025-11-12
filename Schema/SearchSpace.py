@@ -25,7 +25,7 @@ from optuna.distributions import (
 )
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic_settings import (
-    BaseSettings, f
+    BaseSettings,
     PydanticBaseSettingsSource,
     SettingsConfigDict,
     YamlConfigSettingsSource,
