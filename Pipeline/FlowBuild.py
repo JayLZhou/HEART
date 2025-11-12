@@ -12,10 +12,10 @@ class FlowBuilder(ContextMixin, BaseModel):
     
     def __init__(self, config: Config):
         super().__init__(config=config)
-        self.workspace = Workspace(self.config.working_dir, self.config.index_name)
+        self.workspace = Workspace(self.config.working_dir, self.config.exp_name)
         self.doc_chunk = DocChunk(self.config.chunk, self.config.token_model, self.workspace.make_for("chunk_storage"))
         self.chunk_vdb = get_index(
-                get_index_config(self.config, persist_path=self.chunk_vdb_namespace.get_save_path()))
+                get_index_config(self.config, persist_path=self.workspace.make_for("chunk_vdb").get_save_path()))
         
 
 
@@ -23,10 +23,11 @@ class FlowBuilder(ContextMixin, BaseModel):
     def build_indexing(self, corpus):
      
         self.doc_chunk.build_chunks(corpus)
+        
         self.chunk_vdb.build_index(self.doc_chunk.get_chunks(), [], self.config.force_rebuild)
 
 
-    def build_flow(self, params: T.Dict[str, T.Any]) -> RAGFlow:
+    def build_flow(self, params: T.Dict[str, T.Any]):
         """Build the appropriate flow based on parameters.
         Only focus on online flow building.
         """
@@ -46,7 +47,7 @@ class FlowBuilder(ContextMixin, BaseModel):
 
     
     def _build_rag_flow(self, params: T.Dict[str, T.Any], response_synthesizer_llm, template, 
-                   ) -> RAGFlow:
+                   ):
         """Build RAG-based flow."""
        
    

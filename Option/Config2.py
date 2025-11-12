@@ -38,25 +38,12 @@ class Config(WorkingParams, YamlModel):
     
     # Chunking
     chunk: ChunkConfig = ChunkConfig()
-    # chunk_token_size: int = 1200
-    # chunk_overlap_token_size: int = 100
-    # chunk_method: str = "chunking_by_token_size"
-   
     llm_model_max_token_size: int = 32768
   
     use_entity_link_chunk: bool = True  # Only set True for HippoRAG and FastGraphRAG
     
     # Retrieval Parameters
-    retriever: RetrieverConfig = RetrieverConfig()
-
-
-    # ColBert Option
-    use_colbert: bool = True
-    colbert_checkpoint_path: str = "/home/yingli/HippoRAG/exp/colbertv2.0"
-    index_name: str = "nbits_2"
-    similarity_max: float = 1.0
-    # Graph Augmentation
-    enable_graph_augmentation: bool = True
+    retriever: Retriever = Retriever()
 
     # Query Config 
     query: QueryConfig = QueryConfig()

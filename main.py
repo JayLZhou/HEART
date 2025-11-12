@@ -2,6 +2,9 @@
 from Option.Config2 import Config
 import argparse
 import os
+import random
+import numpy as np
+import torch
 from pathlib import Path
 from shutil import copyfile
 from Data.DataLoader import RAGDataset
@@ -21,6 +24,10 @@ args = parser.parse_args()
 
 opt = Config.parse(Path(args.opt), dataset_name=args.dataset_name)
 builder = FlowBuilder(config=opt)
+    
+dataset = RAGDataset(
+        data_dir=os.path.join(opt.data_root, opt.dataset_name)
+)
 
 
 
@@ -42,7 +49,12 @@ def check_dirs(opt):
     return result_dir
 
 
-
+def seed_everything(seed):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
 
 
 def wrapper_tuning(opt, study_config, components, num_trials):
@@ -66,19 +78,17 @@ def wrapper_tuning(opt, study_config, components, num_trials):
             continue
     
 
+
 if __name__ == "__main__":
     welcome_message()
-  
+    seed_everything(42)
     result_dir = check_dirs(opt)
-
-    dataset = RAGDataset(
-        data_dir=os.path.join(opt.data_root, opt.dataset_name)
-    )
 
     # Offline indexing
     corpus = dataset.get_corpus()
- 
     builder.build_indexing(corpus)
 
+    # Online RAG tuning
+    wrapper_tuning(opt, builder)
 
 

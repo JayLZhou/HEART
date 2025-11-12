@@ -37,7 +37,7 @@ class RAGDataset(Dataset):
 if __name__ == "__main__":
     corpus_path = "tmp.json"
     qa_path = "tmp.json"
-    query_dataset = RAGQueryDataset(qa_path=qa_path, corpus_path=corpus_path)
+    query_dataset = RAGDataset(qa_path=qa_path, corpus_path=corpus_path)
     corpus = query_dataset.get_corpus()
     print(corpus[0])
     print(query_dataset[0])
