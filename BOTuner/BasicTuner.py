@@ -7,7 +7,7 @@ class BasicTuner(ABC):
 
 
     @abstractmethod
-    def create_instance(self):
+    def _create_tuner(self):
         pass
 
     @abstractmethod

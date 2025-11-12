@@ -32,10 +32,39 @@ class SyftrEvaluationResult(EvaluationResult):
     retriever_recall: T.Optional[float] = Field(
         default=None, description="Retriever recall score in [0, 1]"
     )
+
+def set_trial(
+    trial: optuna.trial.FrozenTrial | optuna.trial.Trial,
+    study_config: StudyConfig | None = None,
+    params: dict[str, str | bool | int | float] | None = None,
+    is_seeding: bool | None = None,
+    metrics: T.Dict[str, float] | None = None,
+    flow_json: str | None = None,
+):
+    if params:
+        flow_name = get_flow_name(str(params["rag_mode"]))
+        trial.set_user_attr("flow_name", flow_name)
+    if study_config:
+        trial.set_user_attr("dataset", study_config.dataset.name)
+    if is_seeding is not None:
+        trial.set_user_attr("is_seeding", is_seeding)
+    if flow_json:
+        trial.set_user_attr("flow", flow_json)
+    if metrics:
+        set_metrics(trial, metrics)    
+
+def _set_metric(trial: optuna.trial.BaseTrial, metric_name: str, score: T.Any):
+    trial.set_user_attr("metric_" + metric_name, score)
+
+
+def set_metrics(trial: optuna.trial.BaseTrial, metrics: T.Dict[str, float] | None):
+    assert metrics, "No metrics provided"
+    for metric_name, score in metrics.items():
+        _set_metric(trial, metric_name, score)        
 class OptunaTuner(BasicTuner):
     def __init__(self, study_config: StudyConfig):
         self.study_config = study_config
-
+        self._tuner = self._create_tuner()
     def get_sampler(self) -> optuna.samplers.BaseSampler:
         if self.study_config.optimization.sampler == "tpe":
             return optuna.samplers.TPESampler(
@@ -51,7 +80,7 @@ class OptunaTuner(BasicTuner):
         else:
             raise ValueError("Invalid sampler")
 
-    def create_instance(self) -> optuna.Study:
+    def _create_tuner(self) -> optuna.Study:
         """Get a study instance for optuna"""
         study_name = self.study_config.name
 
@@ -73,27 +102,15 @@ class OptunaTuner(BasicTuner):
         self.save_config(study, self.study_config)
         return study
 
-    def evaluate(
-        self,
-        params: T.Dict,
-    ) -> T.Tuple[float, float, T.Dict[str, T.Any], str]:
-        flow_start = datetime.now(timezone.utc).timestamp()
-        logger.info("Evaluating flow with config: %s", params)
-        flow_json = json.dumps(params)
- 
-        obj, results = self._evaluate(params)
 
-        results["failed"] = False
-        results["flow_start"] = flow_start
-        results["flow_end"] = datetime.now(timezone.utc).timestamp()
-        results["flow_duration"] = float(results["flow_end"]) - float(results["flow_start"])
-        logger.info("Evaluation finished. Finalizing trial report. %s", results)
-        return obj, results, flow_json
 
     def _evaluate(
         self,
         params: T.Dict,
     ) -> T.Tuple[float, float, T.Dict[str, float | str]]:
+        flow_start = datetime.now(timezone.utc).timestamp()
+        logger.info("Evaluating flow with config: %s", params)
+        
         flow = self.builder.build_flow(params, self.study_config)
         results: T.Dict[str, T.Any] = self.evaluator.eval_dataset(
             study_config=self.study_config,
@@ -101,13 +118,10 @@ class OptunaTuner(BasicTuner):
             flow=flow,
             evaluation_mode=self.study_config.evaluation.mode,
         )
-
-        obj1 = results[self.study_config.optimization.objective_1_name]
-        obj2 = results[self.study_config.optimization.objective_2_name]
-
-   
-      
-        return obj1, obj2, results
+        import pdb
+        pdb.set_trace()
+        obj = results[self.study_config.optimization.objective_1_name]
+        return obj, results
 
     def save_config(self, study: optuna.Study, study_config: StudyConfig):
         """Save study config to database"""
@@ -116,13 +130,15 @@ class OptunaTuner(BasicTuner):
         for attr, value in attrs.items():
             study.set_user_attr(attr, value)
 
-    def objective(
-        self,
-        trial: optuna.Trial,
-        components: T.List[str],
-    ) -> T.Tuple[float, float]:  # objective function for optuna trials
-        from syftr.tuner.core import set_trial
 
+    
+
+    def start(self):
+        trial = self._tuner.ask()
+        return trial
+
+    def __call__(self, trial: optuna.Trial, components: T.List[str]):
+      
         search_space = self.study_config.search_space
         params: dict[str, str | bool | int | float]
         for i in range(self.study_config.optimization.num_retries_unique_params):
@@ -138,7 +154,7 @@ class OptunaTuner(BasicTuner):
                 )
                 break
         try:
-            obj1, obj2, metrics, flow_json = self.evaluate(params)
+            obj, metrics, flow_json = self._evaluate(params)
         except Exception as ex:
             logger.exception("Objective had an unhandled exception: %s", ex)
             metrics = {
@@ -159,11 +175,10 @@ class OptunaTuner(BasicTuner):
                 flow_json=flow_json,
             )
 
-        return obj1, obj2
+        return obj
 
-    
-
-
+    def backward(self, trial, obj):
+        self._tuner.tell(trial, [obj])
 
     def trial_exists(self,
     study_name: str,

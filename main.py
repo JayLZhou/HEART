@@ -44,13 +44,6 @@ def check_dirs(opt):
 
 
 
-# def wrapper_evaluation(path, opt, result_dir):
-#     eval = Evaluator(path, opt.dataset_name)
-#     res_dict = eval.evaluate()
-#     save_path = os.path.join(result_dir, "metrics.json")
-#     with open(save_path, "w") as f:
-#         f.write(str(res_dict))
-
 
 def wrapper_tuning(opt, study_config, components, num_trials):
  
@@ -61,21 +54,17 @@ def wrapper_tuning(opt, study_config, components, num_trials):
     for i in tqdm(range(num_trials), desc="Running trials"):
         logger.info("Running trial %d/%d", i+1, num_trials)
         try:
-            trial = study.ask()
-            obj_1, obj_2 = objective(trial, study_config, components)
-            study.tell(trial, [obj_1, obj_2])
+            trial = tuner.start()
+            result = tuner(study_config, components)
+            tuner.backward(trial)
+
             results.append({
                 study_config.optimization.objective_1_name: obj_1,
-                study_config.optimization.objective_2_name: obj_2,
             })
-        except optuna.TrialPruned:
-            logger.warning("Trial %d was pruned", i+1)
-            continue
         except Exception as e:
             logger.error(f"Trial %d failed with error: {str(e)}", i+1)
             continue
     
-    return study
 
 if __name__ == "__main__":
     welcome_message()
