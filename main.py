@@ -14,7 +14,6 @@ from Common.Utils import welcome_message
 from tqdm import tqdm
 # from Tuner.OptunaTuner import get_study, objective
 from Common.Logger import logger
-import optuna
 from Pipeline.FlowBuild import FlowBuilder
 
 parser = argparse.ArgumentParser()

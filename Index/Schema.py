@@ -6,7 +6,6 @@ from typing import Optional, Union
 from llama_index.core.embeddings import BaseEmbedding
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_validator
 
-
 class BaseIndexConfig(BaseModel):
     """Common config for index.
 
@@ -39,3 +38,4 @@ class ColBertIndexConfig(BaseIndexConfig):
 
 class FAISSIndexConfig(VectorIndexConfig):
     """Config for faiss-based index."""
+    dimensions: int = Field(default=128, description="Dimensions of the embedding model.")

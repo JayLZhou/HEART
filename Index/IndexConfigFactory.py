@@ -32,7 +32,8 @@ class IndexConfigFactory:
     def _create_faiss_config(config, persist_path):
         return FAISSIndexConfig(
             persist_path=persist_path,
-            embed_model=get_rag_embedding(config.embedding.api_type, config)
+            embed_model=get_rag_embedding(config.embedding.api_type, config),
+            dimensions=config.embedding.dimensions
         )
 
     @staticmethod

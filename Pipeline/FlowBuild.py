@@ -23,7 +23,6 @@ class FlowBuilder(ContextMixin, BaseModel):
     def build_indexing(self, corpus):
      
         self.doc_chunk.build_chunks(corpus)
-        
         self.chunk_vdb.build_index(self.doc_chunk.get_chunks(), [], self.config.force_rebuild)
 
 

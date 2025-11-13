@@ -1,7 +1,7 @@
 from Chunk.ChunkFactory import register_chunking_method
 
 @register_chunking_method("chunking_by_token_size")
-async def chunking_by_token_size(tokens_list: list[list[int]], doc_keys, tiktoken_model, overlap_token_size=128,
+def chunking_by_token_size(tokens_list: list[list[int]], doc_keys, tiktoken_model, overlap_token_size=128,
                                  max_token_size=1024, title_list=None):
     """
     Chunking by token size.

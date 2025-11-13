@@ -14,6 +14,7 @@ from llama_index.core.schema import QueryBundle
 import numpy as np
 from llama_index.vector_stores.faiss import FaissVectorStore
 from concurrent.futures import ProcessPoolExecutor
+from tqdm import tqdm
 
 class FaissIndex(BaseIndex):
     """FaissIndex is designed to be simple and straightforward.
@@ -55,9 +56,10 @@ class FaissIndex(BaseIndex):
     
     def _update_index(self, datas: list[dict[str:Any]], meta_data: list):
         def process_document(data):
+     
             document = Document(
-                doc_id=mdhash_id(data["content"]),
-                text=data["content"],
+                doc_id=data[0],
+                text=data[1].content,
                 metadata={key: data[key] for key in meta_data},
                 excluded_embed_metadata_keys=meta_data,
             )
@@ -65,11 +67,15 @@ class FaissIndex(BaseIndex):
         Settings.embed_model = self.config.embed_model
         documents = [process_document(data) for data in datas]
         texts = [doc.text for doc in documents] 
-
+      
+        # Generate embeddings with progress bar
+        logger.info(f"Generating embeddings for {len(texts)} texts...")
+        
+        # Use batch processing with progress bar
         text_embeddings = self.embedding_model._get_text_embeddings(texts)
 
-        
-        vector_store = FaissVectorStore(faiss_index=faiss.IndexHNSWFlat(self.embedding_model.dimensions, 32))
+        # 32 is the default value of hnsw index
+        vector_store = FaissVectorStore(faiss_index=faiss.IndexHNSWFlat(self.config.dimensions, 32))
         storage_context = StorageContext.from_defaults(vector_store=vector_store)
 
         self._index =  VectorStoreIndex([], storage_context=storage_context,

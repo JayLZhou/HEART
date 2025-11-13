@@ -10,6 +10,7 @@ class EmbeddingType(Enum):
     OPENAI = "openai"
     HF = "hf"
     OLLAMA = "ollama"
+    MODELSCOPE = "modelscope"
 
 
 class EmbeddingConfig(YamlModel):
@@ -23,9 +24,10 @@ class EmbeddingConfig(YamlModel):
 
     model: Optional[str] = None
     cache_folder: Optional[str] = None
+    target_devices: Optional[list[str]] = None
     embed_batch_size: Optional[int] = None
     dimensions: Optional[int] = None  # output dimension of embedding model
-
+    backend: Optional[str] = None
     @field_validator("api_type", mode="before")
     @classmethod
     def check_api_type(cls, v):

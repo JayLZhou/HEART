@@ -1,4 +1,4 @@
-import asyncio
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from Chunk.ChunkFactory import create_chunk_method
 from Common.Utils import mdhash_id
 from Common.Logger import logger
@@ -6,6 +6,7 @@ from Schema.ChunkSchema import TextChunk
 from Storage.ChunkKVStorage import ChunkKVStorage
 from typing import List, Union
 import tiktoken
+import os
 
 class DocChunk:
     def __init__(self, config, token_model, namesapce):
@@ -23,10 +24,10 @@ class DocChunk:
     def namespace(self, namespace):
         self.namespace = namespace
 
-    async def build_chunks(self, docs: Union[str, List[str]], force=True):
+    def build_chunks(self, docs: Union[str, List[str]], force=True):
         logger.info("Starting chunk the given documents")
   
-        is_exist = await self._load_chunk(force)
+        is_exist = self._load_chunk(force)
         if not is_exist or force:
 
             # TODO: Now we only support the str, list[str], Maybe for more types.
@@ -57,7 +58,7 @@ class DocChunk:
             title_list = [doc[1]["title"] for doc in flatten_list]
             tokens = self.token_model.encode_batch(docs, num_threads=16)
 
-            chunks = await self.chunk_method(
+            chunks = self.chunk_method(
                 tokens,
                 doc_keys=doc_keys,
                 tiktoken_model=self.token_model,
@@ -68,42 +69,78 @@ class DocChunk:
 
             for chunk in chunks:
                 chunk["chunk_id"] = mdhash_id(chunk["content"], prefix="chunk-")
-                await self._chunk.upsert(chunk["chunk_id"], TextChunk(**chunk))
+                self._chunk.upsert(chunk["chunk_id"], TextChunk(**chunk))
 
-            await self._chunk.persist()
+            self._chunk.persist()
         logger.info("✅ Finished the chunking stage")
 
-    async def _load_chunk(self, force=False):
+    def _load_chunk(self, force=False):
         if force:
             return False
-        return await self._chunk.load_chunk()
+        return self._chunk.load_chunk()
 
-    async def get_chunks(self):
-        return await self._chunk.get_chunks()
+    def get_chunks(self):
+        return self._chunk.get_chunks()
 
-    async def get_index_by_merge_key(self, chunk_id):
-        return await self._chunk.get_index_by_merge_key(chunk_id)
+    def get_index_by_merge_key(self, chunk_id):
+        return  self._chunk.get_index_by_merge_key(chunk_id)
 
     @property
-    async def size(self):
-        return await self._chunk.size()
+    def size(self):
+        return  self._chunk.size()
 
-    async def get_index_by_key(self, key):
-        return await self._chunk.get_index_by_key(key)
+    def get_index_by_key(self, key):
+        return  self._chunk.get_index_by_key(key)
 
-    async def get_data_by_key(self, chunk_id):
+    def get_data_by_key(self, chunk_id):
 
-        chunk = await self._chunk.get_by_key(chunk_id)
+        chunk =  self._chunk.get_by_key(chunk_id)
         return chunk.content
 
-    async def get_data_by_index(self, index):
-        chunk = await self._chunk.get_data_by_index(index)
+    def get_data_by_index(self, index):
+        chunk =  self._chunk.get_data_by_index(index)
         return chunk.content
 
-    async def get_key_by_index(self, index):
-        return await self._chunk.get_key_by_index(index)
+    def get_key_by_index(self, index):
+        return  self._chunk.get_key_by_index(index)
 
-    async def get_data_by_indices(self, indices):
-        return await asyncio.gather(
-            *[self.get_data_by_index(index) for index in indices]
-        )
+    def get_data_by_indices(self, indices):
+        """Get data by multiple indices using multiprocessing"""
+        if not indices:
+            return []
+        
+        # Extract data dictionary for worker processes
+        data_dict = self._chunk._data
+        
+        # Use ProcessPoolExecutor for parallel processing
+        max_workers = min(len(indices), os.cpu_count() or 4)
+        
+        with ProcessPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all tasks - pass data_dict and index
+            future_to_index = {
+                executor.submit(_get_data_by_index_worker, data_dict, index): index 
+                for index in indices
+            }
+            
+            # Collect results in order
+            results = [None] * len(indices)
+            index_to_position = {idx: pos for pos, idx in enumerate(indices)}
+            
+            for future in as_completed(future_to_index):
+                index = future_to_index[future]
+                try:
+                    result = future.result()
+                    results[index_to_position[index]] = result
+                except Exception as e:
+                    logger.error(f"Error getting data for index {index}: {e}")
+                    results[index_to_position[index]] = None
+        
+        return results
+
+
+def _get_data_by_index_worker(data_dict, index):
+    """Worker function for multiprocessing - must be at module level for pickling"""
+    chunk = data_dict.get(index, None)
+    if chunk is None:
+        return None
+    return chunk.content

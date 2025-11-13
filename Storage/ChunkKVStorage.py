@@ -18,29 +18,29 @@ class ChunkKVStorage(BaseKVStorage):
     _key_to_index: Dict[str, int] = field(init=False, default_factory=dict)
     _np_keys: Optional[npt.NDArray[np.object_]] = field(init=False, default=None)
 
-    async def size(self) -> int:
+    def size(self) -> int:
         return len(self._data)
 
-    async def get_by_key(self, key:str) -> TextChunk:
+    def get_by_key(self, key:str) -> TextChunk:
         return self._data.get(self._key_to_index.get(key, None), None)
 
-    async def get_data_by_index(self, index) -> TextChunk:
+    def get_data_by_index(self, index) -> TextChunk:
         return self._data.get(index, None)
 
 
         
-    async def get_index_by_merge_key(self, merge_chunk_id: str) -> list[int]:
+    def get_index_by_merge_key(self, merge_chunk_id: str) -> list[int]:
         key_list  = split_string_by_multi_markers(merge_chunk_id, [GRAPH_FIELD_SEP])
         index_list = [self._key_to_index.get(chunk_id, None) for chunk_id in key_list]
         return index_list
     
-    async def get_index_by_key(self, key:str) -> int:
+    def get_index_by_key(self, key:str) -> int:
         return self._key_to_index.get(key, None)
 
 
 
 
-    async def upsert_batch(self, keys, values) -> None:
+    def upsert_batch(self, keys, values) -> None:
         for key, value in zip(keys, values):
             self._chunk[key] = value
             index = self._key_to_index.get(key, None)
@@ -49,7 +49,7 @@ class ChunkKVStorage(BaseKVStorage):
                 self._key_to_index[key] = index
                 self._data[index] = value
 
-    async def upsert(self, key, value) -> None:
+    def upsert(self, key, value) -> None:
         
         self._chunk[key] = value
         index = self._key_to_index.get(key, None)
@@ -59,7 +59,7 @@ class ChunkKVStorage(BaseKVStorage):
         # If index is already in the data, we need to update the value
         self._data[index] = value
 
-    async def delete_by_key(self, key) -> None:
+    def delete_by_key(self, key) -> None:
 
         index = self._key_to_index.pop(key, None)
         if index is not None:
@@ -68,7 +68,7 @@ class ChunkKVStorage(BaseKVStorage):
             logger.warning(f"Key '{key}' not found in indexed key-value storage.")
 
     
-    async def chunk_datas(self):
+    def chunk_datas(self):
         inserting_chunks = {key: value for key, value in self._chunk.items() if key in self._chunk}
 
         
@@ -81,7 +81,7 @@ class ChunkKVStorage(BaseKVStorage):
     def dat_key_pkl_file(self):
         return self.namespace.get_save_path(self.chunk_name)
     
-    async def load_chunk(self):
+    def load_chunk(self):
         # Attempting to load the graph from the specified pkl file
         logger.info(f"Attempting to load the chunk data from: {self.dat_idx_pkl_file} and {self.dat_key_pkl_file}" )
         if os.path.exists(self.dat_idx_pkl_file) and os.path.exists(self.dat_key_pkl_file):
@@ -102,7 +102,7 @@ class ChunkKVStorage(BaseKVStorage):
             # Pkl file doesn't exist; need to construct the tree from scratch
             logger.info("Pkl file does not exist! Need to chunk the documents from scratch.")
             return False
-    async def _persist(self):
+    def _persist(self):
         logger.info(f"Writing data into {self.dat_idx_pkl_file} and {self.dat_key_pkl_file}")
   
         self.write_chunk_data(self._data, self.dat_idx_pkl_file)
@@ -112,14 +112,14 @@ class ChunkKVStorage(BaseKVStorage):
         with open(pkl_file, "wb") as file:
             pickle.dump(data, file)
 
-    async def persist(self):
+    def persist(self):
         # Attempting to save the graph to the specified pkl file
-        await self._persist()
+        self._persist()
 
-    async def get_chunks(self):
+    def get_chunks(self):
         return list(self._chunk.items())
     
-    async def size(self):
+    def size(self):
         print(len(self._data))
         print(len(self._chunk))
         assert len(self._data) == len(self._chunk)

@@ -97,7 +97,7 @@ class SeparatorSplitter:
 
 
 @register_chunking_method("chunking_by_seperators")
-async def chunking_by_seperators(tokens_list: list[list[int]], doc_keys, tiktoken_model, overlap_token_size=128,
+def chunking_by_seperators(tokens_list: list[list[int]], doc_keys, tiktoken_model, overlap_token_size=128,
                                  max_token_size=1024, title_list=None):
     """
     Chunking by separators.

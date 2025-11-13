@@ -1,2 +1,2 @@
 # Here is our RAG tuning repo
-python main.py -opt Option/RAPTOR.yaml --dataset_name HopotQA
+python main.py -opt Option/TPEBO.yaml -dataset_name hotpotqa

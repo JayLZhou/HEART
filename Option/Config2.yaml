@@ -1,27 +1,3 @@
-# llm:
-#   api_type: "open_llm" # or openai
-#   base_url: 'YOUR_BASE_URL'
-#   model: "YOUR_MODEL"
-#   api_key: "YOUR_API_KEY"
-
-# embedding:
-#   api_type: "hf"  # or  ollama / etc.
-#   # base_url: "https://cfcus02.opapi.win/v1"  # or forward url / other llm url
-#   api_key: "YOUR_API_KEY"
-#   model: "BAAI/bge-m3"
-#   cache_dir: ""
-#   dimensions: 1024
-#   max_token_size: 8102
-#   embed_batch_size: 128
-#   embedding_func_max_async: 16
- 
-# data_root:  "YOUR_ROOT_DATA" # Root directory for data
-
-
-
-# working_dir: ./ # Result directory for the experiment
-# exp_name:  # Experiment name
-# # 
 
 llm:
   api_type: "openai"
@@ -31,15 +7,17 @@ llm:
   # api_key: "sk-STmQ0VyP26d5093497aET3BLbkFJAB535192D50E4dB8AeC8"
 
 embedding:
-  api_type: "openai"  # or  ollama / etc.
-  base_url: "https://cfcus02.opapi.win/v1"  # or forward url / other llm url
+  api_type: "modelscope"  # or  ollama / etc.
+  base_url: "http://localhost:8007/v1"  # or forward url / other llm url
   api_key: "sk-LGORY9rX516364f6fd78T3BLbKFJ0cD7f508E7aF41C0a769"
   # api_key: "sk-STmQ0VyP26d5093497aET3BLbkFJAB535192D50E4dB8AeC8"
-  model: "text-embedding-3-small"
-  cache_dir: ""
-  dimensions: 128
+  model: "Qwen3-Embedding-0.6B"
+  cache_folder: ""
+  dimensions: 1024
   max_token_size: 8102
   embed_batch_size: 128
+  target_devices: ["cuda:4"]
+  backend: "openai"
   embedding_func_max_async: 16
  
 data_root: /mnt/data/wangshu/hcarag/ids_data # Root directory for data
