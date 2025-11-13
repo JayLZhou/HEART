@@ -13,7 +13,7 @@ from typing import Any, Optional
 from Common.BaseFactory import GenericFactory
 from Common.Logger import logger
 from Tuner.BasicTuner import BasicTuner
-
+from Tuner.BOTuner.OptunaTuner import OptunaTuner
 
 class TunerType(Enum):
     """Tuner type enumeration."""
@@ -30,15 +30,7 @@ class TunerFactory(GenericFactory):
             TunerType.BO: self._create_bo_tuner,
             TunerType.MAB: self._create_mab_tuner,
             TunerType.OTHER: self._create_other_tuner,
-            # String aliases for convenience
-            "bo": self._create_bo_tuner,
-            "BO": self._create_bo_tuner,
-            "bayesian": self._create_bo_tuner,
-            "mab": self._create_mab_tuner,
-            "MAB": self._create_mab_tuner,
-            "bandit": self._create_mab_tuner,
-            "other": self._create_other_tuner,
-            "OTHER": self._create_other_tuner,
+      
         }
         super().__init__(creators)
 
@@ -68,32 +60,6 @@ class TunerFactory(GenericFactory):
 
     def _create_bo_tuner(self, study_config=None, **kwargs) -> BasicTuner:
         """Create a Bayesian Optimization based tuner (Optuna)."""
-        # Try multiple import paths for OptunaTuner
-        OptunaTuner = None
-        
-        # Path 1: Tuner.BOTuner.OptunaTuner
-        try:
-            from Tuner.BOTuner.OptunaTuner import OptunaTuner
-        except ImportError:
-            # Path 2: BOTuner.OptunaTuner (if moved from old location)
-            try:
-                from BOTuner.OptunaTuner import OptunaTuner
-            except ImportError:
-                # Path 3: Direct import with path manipulation
-                try:
-                    import sys
-                    import os
-                    current_dir = os.path.dirname(os.path.abspath(__file__))
-                    project_root = os.path.dirname(os.path.dirname(current_dir))
-                    if project_root not in sys.path:
-                        sys.path.insert(0, project_root)
-                    from BOTuner.OptunaTuner import OptunaTuner
-                except ImportError:
-                    raise ImportError(
-                        "OptunaTuner not found. Please ensure OptunaTuner is available. "
-                        "Expected paths: Tuner.BOTuner.OptunaTuner or BOTuner.OptunaTuner"
-                    )
-        
         if study_config is None:
             raise ValueError("study_config is required for BO tuner")
         

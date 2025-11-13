@@ -6,8 +6,9 @@ import numpy as np
 from datetime import datetime, timezone
 from Config import StudyConfig
 from Common.Logger import logger
-from BOTuner.HierarchicalTPE import HierarchicalTPESampler
-from BOTuner.BasicTuner import BasicTuner
+from Tuner.BOTuner.HierarchicalTPE import HierarchicalTPESampler
+from Tuner.BOTuner.BasicBOTuner import BasicBOTuner
+from Pipeline.FlowBuild import FlowBuilder
 class SyftrEvaluationResult(EvaluationResult):
     class Config:
         arbitrary_types_allowed = True
@@ -62,8 +63,9 @@ def set_metrics(trial: optuna.trial.BaseTrial, metrics: T.Dict[str, float] | Non
     for metric_name, score in metrics.items():
         _set_metric(trial, metric_name, score)        
 class OptunaTuner(BasicTuner):
-    def __init__(self, study_config: StudyConfig):
+    def __init__(self, study_config: StudyConfig, builder: FlowBuilder):
         self.study_config = study_config
+        self.builder = builder
         self._tuner = self._create_tuner()
     def get_sampler(self) -> optuna.samplers.BaseSampler:
         if self.study_config.optimization.sampler == "tpe":

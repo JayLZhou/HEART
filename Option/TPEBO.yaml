@@ -5,7 +5,7 @@ llm_model_max_token_size: 32768
 index_name: tree_graph_balanced
 force_rebuild: False
 vdb_type: faiss  # vector/colbert
-tuner_type: BO
+tuner_type: bo
 
 # Chunk Config 
 chunk:

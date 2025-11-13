@@ -12,7 +12,7 @@ from Common.Utils import welcome_message
 from tqdm import tqdm
 from Common.Logger import logger
 from Pipeline.FlowBuild import FlowBuilder
-
+from Tuner.TunerFactory import get_tuner
 parser = argparse.ArgumentParser()
 parser.add_argument("-opt", type=str, help="Path to option YMAL file.")
 parser.add_argument("-dataset_name", type=str, help="Name of the dataset.")
