@@ -1,8 +1,3 @@
-# flake8: noqa: E402
-from syftr.event_loop import fix_asyncio
-
-fix_asyncio()
-
 import asyncio
 import itertools
 import logging

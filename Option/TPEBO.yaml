@@ -1,13 +1,11 @@
 ################################# Working settings  #################################
 # Basic Config
-use_entities_vdb: True
-use_relations_vdb: False  # Only set True for LightRAG
 llm_model_max_token_size: 32768
-# Data
 
 index_name: tree_graph_balanced
 force_rebuild: False
 vdb_type: faiss  # vector/colbert
+tuner_type: BO
 
 # Chunk Config 
 chunk:

@@ -93,9 +93,7 @@ class SearchSpace(BaseModel):
         return distributions
 
     def sample(self, trial: Trial, parameters: T.List[str] = PARAMETERS) -> ParamDict:
-        for param in parameters:
-            assert param in PARAMETERS, f"Invalid parameter: {param}"
-
+ 
         params: ParamDict = {
             "few_shot_enabled": False,
         }

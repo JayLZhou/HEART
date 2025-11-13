@@ -25,6 +25,8 @@ class Config(WorkingParams, YamlModel):
     # Key Parameters
     llm: LLMConfig
     exp_name: str = "default"
+    num_trials: int = 10
+    
     # RAG Embedding
     embedding: EmbeddingConfig = EmbeddingConfig()
 

@@ -8,11 +8,8 @@ import torch
 from pathlib import Path
 from shutil import copyfile
 from Data.DataLoader import RAGDataset
-import pandas as pd
-# from Utils.Evaluation import Evaluator
 from Common.Utils import welcome_message
 from tqdm import tqdm
-# from Tuner.OptunaTuner import get_study, objective
 from Common.Logger import logger
 from Pipeline.FlowBuild import FlowBuilder
 
@@ -23,10 +20,8 @@ args = parser.parse_args()
 
 opt = Config.parse(Path(args.opt), dataset_name=args.dataset_name)
 builder = FlowBuilder(config=opt)
-    
-dataset = RAGDataset(
-        data_dir=os.path.join(opt.data_root, opt.dataset_name)
-)
+dataset = RAGDataset(data_dir=os.path.join(opt.data_root, opt.dataset_name))
+
 
 
 
@@ -56,17 +51,17 @@ def seed_everything(seed):
     torch.cuda.manual_seed_all(seed)
 
 
-def wrapper_tuning(opt, study_config, components, num_trials):
+def wrapper_tuning(config):
  
     logger.info("Starting sequential optimization")
 
     results = []
     
-    for i in tqdm(range(num_trials), desc="Running trials"):
-        logger.info("Running trial %d/%d", i+1, num_trials)
+    for i in tqdm(range(config.num_trials), desc="Running trials"):
+        logger.info("Running trial %d/%d", i+1, config.num_trials)
         try:
             trial = tuner.start()
-            result = tuner(study_config, components)
+            result = tuner(config)
             tuner.backward(trial)
 
             results.append({
@@ -87,7 +82,8 @@ if __name__ == "__main__":
     corpus = dataset.get_corpus()
     builder.build_indexing(corpus)
 
+    tuner = get_tuner(config=opt, builder=builder)
     # Online RAG tuning
-    wrapper_tuning(opt, builder)
+    wrapper_tuning(opt, tuner)
 
 
