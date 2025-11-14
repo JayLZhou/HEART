@@ -114,8 +114,8 @@ class OptunaTuner(BasicBOTuner):
     ) -> T.Tuple[float, float, T.Dict[str, float | str]]:
         flow_start = datetime.now(timezone.utc).timestamp()
         logger.info("Evaluating flow with config: %s", params)
-        
-        flow = self.builder.build_flow(params, self.study_config)
+
+        flow = self.builder.build_flow(params, self.config)
         results: T.Dict[str, T.Any] = self.evaluator.eval_dataset(
             study_config=self.study_config,
             dataset_iter=self.study_config.dataset,
@@ -137,28 +137,26 @@ class OptunaTuner(BasicBOTuner):
 
     
 
-    def start(self):
-        trial = self._tuner.ask()
-        return trial
 
-    def __call__(self, trial: optuna.Trial, components: T.List[str]):
-      
+
+    def __call__(self):
+        trial = self._tuner.ask()
         search_space = self.config.tuner.search_space
         params: dict[str, str | bool | int | float]
         for i in range(self.config.tuner.optimization.num_retries_unique_params):
-            import pdb
-            pdb.set_trace()
-            params = search_space.sample(trial, components)
+        
+            params = search_space.sample(trial, self.config.tuner.tuner_params)
+            
             if not self.config.tuner.optimization.skip_existing:
                 logger.info("Using generated parameter combination without check")
                 break
-            if not self.trial_exists(self.study_config.name, params):
-                logger.info(
-                    "Found novel parameter combination after %i retries: %s",
-                    i,
-                    str(params),
-                )
-                break
+            # if not self._trial_exists(self.config.tuner.name, params):
+            #     logger.info(
+            #         "Found novel parameter combination after %i retries: %s",
+            #         i,
+            #         str(params),
+            #     )
+            #     break
         try:
             obj, metrics, flow_json = self._evaluate(params)
         except Exception as ex:
@@ -180,13 +178,14 @@ class OptunaTuner(BasicBOTuner):
                 metrics=metrics,
                 flow_json=flow_json,
             )
+        self._tuner.tell(trial, [obj])
 
         return obj
 
-    def backward(self, trial, obj):
-        self._tuner.tell(trial, [obj])
+   
+ 
 
-    def trial_exists(self,
+    def _trial_exists(self,
     study_name: str,
     params: T.Dict[str, T.Any],
     storage: str) -> bool:

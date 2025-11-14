@@ -60,9 +60,9 @@ def wrapper_tuning(config, tuner):
     for i in tqdm(range(config.num_trials), desc="Running trials"):
         logger.info("Running trial %d/%d", i+1, config.num_trials)
         try:
-            trial = tuner.start()
-            result = tuner(trial, [])
-            tuner.backward(trial)
+            # trial = tuner.start()
+            result = tuner()
+            # tuner.backward(trial)
 
             results.append({
                 study_config.optimization.objective_1_name: obj_1,

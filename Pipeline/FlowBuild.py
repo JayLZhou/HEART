@@ -5,6 +5,7 @@ from Chunk.DocChunk import DocChunk
 from Common.ContextMixin import ContextMixin
 from Option.Config2 import Config
 from pydantic import BaseModel
+from Prompt import get_template
 # from Pipeline.RAGFlow import RAGFlow
 
 class FlowBuilder(ContextMixin, BaseModel):
@@ -26,20 +27,16 @@ class FlowBuilder(ContextMixin, BaseModel):
         self.chunk_vdb.build_index(self.doc_chunk.get_chunks(), [], self.config.force_rebuild)
 
 
-    def build_flow(self, params: T.Dict[str, T.Any]):
+    def build_flow(self, params: T.Dict[str, T.Any], config: Config):
         """Build the appropriate flow based on parameters.
         Only focus on online flow building.
         """
   
-         
-        response_synthesizer_llm = self.llm
 
+        # get response synthesizer llm
+        response_synthesizer_llm = self.get_llm(params["response_synthesizer_llm"])
         # get template
-        template_name = params["template_name"]
-        
-        template = get_template(template_name)
-   
-        
+        template = get_template(params["template_name"])
         # build rag flow
         return self._build_rag_flow(params, response_synthesizer_llm, template)
     
@@ -56,7 +53,7 @@ class FlowBuilder(ContextMixin, BaseModel):
    
         
         # Build specific RAG flow type
-        rag_mode = params["rag_mode"]
+  
         common_args = {
             "retriever": rag_retriever,
             "response_synthesizer_llm": response_synthesizer_llm,
@@ -66,8 +63,9 @@ class FlowBuilder(ContextMixin, BaseModel):
             "params": params,
         }
         
-        if rag_mode == "rag":
-            return RAGFlow(**common_args)
-        else:
-            raise ValueError(f"only 'rag' modes are supported, got: {rag_mode}")
+        import pdb
+        pdb.set_trace()
+    
+        return RAGFlow(**common_args)
+
       

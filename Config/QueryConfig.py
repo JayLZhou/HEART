@@ -1,47 +1,45 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from typing import Optional, List
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from Config.SearchSpaceMix import *
+import typing as T
+import math
+from Common.Constants import DEFAULT_LLMS
 
 
-class QueryConfig(BaseModel):
+class QueryConfig(BaseModel, SearchSpaceMixin):
     """Query configuration"""
-    
-    # Query processing
-    enable_query_expansion: bool = False
-    query_expansion_method: str = "llm"  # llm, keyword, embedding
-    
-    # Query rewriting
-    enable_query_rewriting: bool = False
-    query_rewrite_prompt_path: Optional[str] = None
-    
-    # Query decomposition
-    enable_query_decomposition: bool = False
-    max_subqueries: int = 3
-    
-    # Query type detection
-    enable_query_type_detection: bool = False
-    query_types: List[str] = ["factoid", "list", "comparison", "reasoning"]
-    
-    # Answer generation
-    answer_prompt_path: Optional[str] = None
-    enable_citation: bool = True
-    max_answer_length: int = 512
-    
-    # Multi-hop reasoning
-    enable_multi_hop: bool = False
-    max_reasoning_steps: int = 3
-    
-    # Conversation
-    enable_conversation_history: bool = False
-    max_history_length: int = 5
-    
-    # Response format
-    response_format: str = "text"  # text, json, markdown
-    
-    # Quality control
-    enable_answer_verification: bool = False
-    min_confidence_score: float = 0.6
+    subquestion_engine_llms: T.List[str] = Field(
+        default_factory=lambda: DEFAULT_LLMS,
+        description="LLMs for the sub-question engine.",
+    )
+    subquestion_response_synthesizer_llms: T.List[str] = Field(
+        default_factory=lambda: DEFAULT_LLMS,
+        description="LLMs for synthesizing responses to subquestions.",
+    )
 
+    def defaults(self, prefix: str = "") -> T.Dict[str, T.Any]:
+        return {
+            f"{prefix}subquestion_engine_llm": self.subquestion_engine_llms[0],
+            f"{prefix}subquestion_response_synthesizer_llm": self.subquestion_response_synthesizer_llms[
+                0
+            ],
+        }
 
+    def build_distributions(self, prefix: str = "") -> T.Dict[str, BaseDistribution]:
+        return {
+            f"{prefix}subquestion_engine_llm": CategoricalDistribution(
+                self.subquestion_engine_llms
+            ),
+            f"{prefix}subquestion_response_synthesizer_llm": CategoricalDistribution(
+                self.subquestion_response_synthesizer_llms
+            ),
+        }
 
+    def get_cardinality(self) -> int:
+        categorical_dists = [
+            self.subquestion_engine_llms,
+            self.subquestion_response_synthesizer_llms,
+        ]
+        return math.prod([len(dist) for dist in categorical_dists])

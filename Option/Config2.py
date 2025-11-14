@@ -1,10 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import os
-from dataclasses import field
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from Config import *
 from Common.Constants import CONFIG_ROOT, PROJECT_ROOT
 from Utils.YamlModel import YamlModel
@@ -23,7 +22,7 @@ class Config(WorkingParams, YamlModel):
     """Configurations for our project"""
 
     # Key Parameters
-    llm: LLMConfig
+    llms: List[LLMConfig] = Field(default_factory=list, description="Multiple LLM configurations pool")
     exp_name: str = "default"
     num_trials: int = 10
 

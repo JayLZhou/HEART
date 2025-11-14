@@ -1,10 +1,19 @@
 
-llm:
-  api_type: "openai"
-  base_url: "https://cfcus02.opapi.win/v1"  # or forward url / other llm url
-  model: "TA/meta-llama/Llama-3-8b-chat-hf"
-  api_key: "sk-LGORY9rX516364f6fd78T3BLbKFJ0cD7f508E7aF41C0a769"
-  # api_key: "sk-STmQ0VyP26d5093497aET3BLbkFJAB535192D50E4dB8AeC8"
+# Multiple LLM configurations pool (model name is the unique key)
+llms:
+  - api_type: "openai"
+    base_url: "https://cfcus02.opapi.win/v1"
+    model: "TA/meta-llama/Llama-3-8b-chat-hf"
+    api_key: "sk-LGORY9rX516364f6fd78T3BLbKFJ0cD7f508E7aF41C0a769"
+  - api_type: "openai"
+    base_url: "https://cfcus02.opapi.win/v1"
+    model: "gpt-4o-mini"
+    api_key: "sk-LGORY9rX516364f6fd78T3BLbKFJ0cD7f508E7aF41C0a769"
+  - api_type: "openai"
+    base_url: "https://cfcus02.opapi.win/v1"
+    model: "gpt-4o"
+    api_key: "sk-LGORY9rX516364f6fd78T3BLbKFJ0cD7f508E7aF41C0a769"
+
 
 embedding:
   api_type: "modelscope"  # or  ollama / etc.

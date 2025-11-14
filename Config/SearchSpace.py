@@ -1,10 +1,12 @@
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field
 import typing as T
 from Common.Constants import TEMPLATE_NAMES, DEFAULT_LLMS
 from Config.RetrieverConfig import Retriever
 from Config.TopKConfig import TopK
 from Config.RerankConfig import Reranker
 from Config.SearchSpaceMix import *
+from Config.QueryConfig import QueryConfig
+
 
 class SearchSpace(BaseModel):
     model_config = ConfigDict(extra="forbid")  # Forbids unknown fields
@@ -30,19 +32,16 @@ class SearchSpace(BaseModel):
         description="Configuration for the RAG retriever.",
     )
 
-    reranker_enabled: T.List[bool] = Field(
-        default_factory=lambda: [True, False],
-        description="Whether reranking is enabled.",
-    )
+
     reranker: Reranker = Field(
         default_factory=Reranker, description="Configuration for the reranker."
     )
-    hyde_enabled: T.List[bool] = Field(
-        default_factory=lambda: [True, False], description="Whether HyDE is enabled."
+
+    sub_question: QueryConfig = Field(
+        default_factory=QueryConfig, description="Configuration for the sub-question."
     )
-    @model_validator(mode="before")
-    def set_defaults(self):
-        self._default_params = self._defaults()
+
+
 
     def _defaults(self) -> ParamDict:
         return {
@@ -86,11 +85,9 @@ class SearchSpace(BaseModel):
         return distributions
 
     def sample(self, trial: Trial, parameters: T.List[str]) -> ParamDict:
- 
+        if not hasattr(self, "_default_params"):
+            self._default_params = self._defaults()
         params: ParamDict = {}
-
-
-
         if "template_name" in parameters:
             params["template_name"] = trial.suggest_categorical(
                 "template_name", self.template_names
@@ -112,24 +109,16 @@ class SearchSpace(BaseModel):
             params.update(**self.rag_retriever.defaults())
 
         if "reranker" in parameters:
-            params["reranker_enabled"] = trial.suggest_categorical(
-                "reranker_enabled", self.reranker_enabled
-            )
-            if params["reranker_enabled"]:
                 params.update(**self.reranker.sample(trial))
+                params["reranker_enabled"] = True
         else:
             params["reranker_enabled"] = False
 
-          
 
-        if params["rag_mode"] == "sub_question_rag":
-            if "sub_question_rag" in parameters:
-                params.update(**self.sub_question_rag.sample(trial))
-            else:
-                params.update(**self.sub_question_rag.defaults())
-  
-
-
+        if "sub_question" in parameters:
+            params.update(**self.sub_question.sample(trial))
+        else:
+            params.update(**self.sub_question.defaults())
         return params
 
     def get_cardinality(self) -> int:
@@ -142,7 +131,6 @@ class SearchSpace(BaseModel):
         )
     
         sub_card *= self.rag_retriever.get_cardinality()
-        sub_card *= self.splitter.get_cardinality()
         if True in self.reranker_enabled:
             sub_card *= self.reranker.get_cardinality()
 

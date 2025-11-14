@@ -33,6 +33,10 @@ class TunerConfig(BaseSettings):
     name: str = Field(
         default="default", description="Name of the tuner."
     )
+    tuner_params: T.List[str] = Field(
+        default_factory=lambda: ["template_name", "response_synthesizer_llm", "reranker", "rag_retriever", "reranker", "sub_question"],
+        description="Parameters to tune."
+    )
     evaluation: Evaluation = Field(
         default_factory=Evaluation, description="LLM-as-a-judge configuration."
     )
