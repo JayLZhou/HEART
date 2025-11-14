@@ -115,7 +115,7 @@ class OptunaTuner(BasicBOTuner):
         flow_start = datetime.now(timezone.utc).timestamp()
         logger.info("Evaluating flow with config: %s", params)
 
-        flow = self.builder.build_flow(params, self.config)
+      
         results: T.Dict[str, T.Any] = self.evaluator.eval_dataset(
             study_config=self.study_config,
             dataset_iter=self.study_config.dataset,
@@ -158,6 +158,8 @@ class OptunaTuner(BasicBOTuner):
             #     )
             #     break
         try:
+         
+            self.builder.build_flow(params, self.config)
             obj, metrics, flow_json = self._evaluate(params)
         except Exception as ex:
             logger.exception("Objective had an unhandled exception: %s", ex)

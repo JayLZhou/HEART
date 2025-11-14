@@ -32,6 +32,7 @@ class Config(WorkingParams, YamlModel):
     # Basic Config
     force_rebuild: bool = False
     vdb_type: str = "vector"  # vector/colbert
+    sparse_index_type: str = "bm25"  # bm25
     tuner_type: TunerType = TunerType.BO
     token_model: str = "gpt-3.5-turbo"
     

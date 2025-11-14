@@ -39,3 +39,8 @@ class ColBertIndexConfig(BaseIndexConfig):
 class FAISSIndexConfig(VectorIndexConfig):
     """Config for faiss-based index."""
     dimensions: int = Field(default=128, description="Dimensions of the embedding model.")
+
+class BMIndexConfig(VectorIndexConfig):
+    """Config for BM index."""
+    k1: float = 1.2
+    b: float = 0.5    

@@ -182,11 +182,11 @@ class Retriever(BaseModel, SearchSpaceMixin):
 
         return distributions
 
-    def sample(self, trial: Trial, prefix: str = "rag_") -> ParamDict:
+    def sample(self, trial: Trial, prefix: str = "") -> ParamDict:
         method = f"{prefix}method"
         embedding_model = f"{prefix}embedding_model"
         use_query_decomp = f"{prefix}query_decomposition_enabled"
-
+   
         params = {
             method: trial.suggest_categorical(method, self.methods),
             use_query_decomp: trial.suggest_categorical(

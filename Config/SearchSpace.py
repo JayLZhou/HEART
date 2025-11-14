@@ -102,23 +102,19 @@ class SearchSpace(BaseModel):
         else:
             params["response_synthesizer_llm"] = self._default_params["response_synthesizer_llm"]
 
-
-        if "rag_retriever" in parameters:
-            params.update(**self.rag_retriever.sample(trial))
-        else:
-            params.update(**self.rag_retriever.defaults())
-
+        params['rag_retriever'] = self.rag_retriever.sample(trial)
+       
         if "reranker" in parameters:
-                params.update(**self.reranker.sample(trial))
-                params["reranker_enabled"] = True
+                params['reranker'] = self.reranker.sample(trial)
+                params['reranker']["reranker_enabled"] = True
         else:
-            params["reranker_enabled"] = False
+            params['reranker']["reranker_enabled"] = False
 
-
+        
         if "sub_question" in parameters:
-            params.update(**self.sub_question.sample(trial))
+            params['sub_question'] = self.sub_question.sample(trial)
         else:
-            params.update(**self.sub_question.defaults())
+            params['sub_question'] = self.sub_question.defaults()
         return params
 
     def get_cardinality(self) -> int:

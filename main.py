@@ -21,7 +21,7 @@ args = parser.parse_args()
 opt = Config.parse(Path(args.opt), dataset_name=args.dataset_name)
 builder = FlowBuilder(config=opt)
 dataset = RAGDataset(data_dir=os.path.join(opt.data_root, opt.dataset_name))
-
+num_trials = opt.num_trials
 
 
 
@@ -51,14 +51,14 @@ def seed_everything(seed):
     torch.cuda.manual_seed_all(seed)
 
 
-def wrapper_tuning(config, tuner):
+def wrapper_tuning(tuner):
  
-    logger.info("Starting sequential optimization")
+    logger.info("Starting RAG tuning: query level")
 
     results = []
     
-    for i in tqdm(range(config.num_trials), desc="Running trials"):
-        logger.info("Running trial %d/%d", i+1, config.num_trials)
+    for i in tqdm(range(num_trials), desc="Running trials"):
+        logger.info("Running trial %d/%d", i+1, num_trials)
         try:
             # trial = tuner.start()
             result = tuner()
@@ -85,6 +85,6 @@ if __name__ == "__main__":
     tuner = get_tuner(config=opt, builder=builder)
     # Online RAG tuning
 
-    wrapper_tuning(opt, tuner)
+    wrapper_tuning(tuner)
 
 

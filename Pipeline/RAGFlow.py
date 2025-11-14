@@ -40,10 +40,10 @@ from hammer.configuration import cfg
 from hammer.instrumentation.arize import instrument_arize
 from hammer.llm import get_llm_name, get_tokenizer
 from hammer.logger import logger
-# from hammer.studies import get_critique_template, get_react_template
+
 from hammer.rerankers.enhanced_factory import build_reranker_postprocessor
 
-class RAGFlow():
+class RAGFlow(BaseModel):
     response_synthesizer_llm: LLM | FunctionCallingLLM
     template: str | None = None
     name: str = "RAG Flow"
@@ -162,3 +162,30 @@ class RAGFlow():
         )
         duration = time.perf_counter() - start_time
         return completion_response, duration
+
+    def query(self, query: str) -> str:
+        # Decompose the query into sub-questions
+        sub_questions = self.decompose_query(query)
+        for sub_question in sub_questions:
+            # retrieve the relevant nodes
+            nodes = self.retrieve(sub_question)
+            # Rerank the nodes
+            reranked_nodes = self.rerank(nodes)
+            # Generate the response
+            response = self.generate(sub_question, reranked_nodes)
+            responses.append(response)
+        # Combine the responses
+        response = self.combine_responses(responses)
+        return response    
+
+    def decompose_query(self, query: str) -> T.List[str]:
+        # Decompose the query into sub-questions
+        return self.query_engine.decompose_query(query)
+
+    def rerank(self, nodes: T.List[NodeWithScore]) -> T.List[NodeWithScore]:
+        # Rerank the nodes
+        return self.query_engine.rerank(nodes)
+
+    def combine_responses(self, responses: T.List[str]) -> str:
+        # Combine the responses
+        return self.query_engine.combine_responses(responses)

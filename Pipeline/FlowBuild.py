@@ -17,7 +17,8 @@ class FlowBuilder(ContextMixin, BaseModel):
         self.doc_chunk = DocChunk(self.config.chunk, self.config.token_model, self.workspace.make_for("chunk_storage"))
         self.chunk_vdb = get_index(
                 get_index_config(self.config, persist_path=self.workspace.make_for("chunk_vdb").get_save_path()))
-        
+        self.sparse_index = get_index(
+                get_index_config(self.config, persist_path=self.workspace.make_for("sparse_index").get_save_path()))
 
 
 
@@ -25,7 +26,7 @@ class FlowBuilder(ContextMixin, BaseModel):
      
         self.doc_chunk.build_chunks(corpus)
         self.chunk_vdb.build_index(self.doc_chunk.get_chunks(), [], self.config.force_rebuild)
-
+        self.sparse_index
 
     def build_flow(self, params: T.Dict[str, T.Any], config: Config):
         """Build the appropriate flow based on parameters.
@@ -38,18 +39,19 @@ class FlowBuilder(ContextMixin, BaseModel):
         # get template
         template = get_template(params["template_name"])
         # build rag flow
-        return self._build_rag_flow(params, response_synthesizer_llm, template)
+        retriever = get_retriever(params["rag_retriever"])
+        self._build_rag_flow(params, response_synthesizer_llm, template)
     
 
     
-    def _build_rag_flow(self, params: T.Dict[str, T.Any], response_synthesizer_llm, template, 
-                   ):
+    def _build_rag_flow(self, params: T.Dict[str, T.Any], response_synthesizer_llm, template):
         """Build RAG-based flow."""
        
    
      
         reranker_top_k = params.get("reranker_top_k") if params.get("reranker_enabled") else None
-        
+        import pdb
+        pdb.set_trace()
    
         
         # Build specific RAG flow type
@@ -57,7 +59,6 @@ class FlowBuilder(ContextMixin, BaseModel):
         common_args = {
             "retriever": rag_retriever,
             "response_synthesizer_llm": response_synthesizer_llm,
-            "docstore": rag_docstore,
             "template": template,
             "reranker_top_k": reranker_top_k,
             "params": params,
@@ -66,6 +67,6 @@ class FlowBuilder(ContextMixin, BaseModel):
         import pdb
         pdb.set_trace()
     
-        return RAGFlow(**common_args)
+        self.flow =  RAGFlow(**common_args)
 
       
