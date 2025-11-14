@@ -18,7 +18,7 @@ class FlowBuilder(ContextMixin, BaseModel):
         self.chunk_vdb = get_index(
                 get_index_config(self.config, persist_path=self.workspace.make_for("chunk_vdb").get_save_path()))
         self.sparse_index = get_index(
-                get_index_config(self.config, persist_path=self.workspace.make_for("sparse_index").get_save_path()))
+                get_index_config(self.config, persist_path=self.workspace.make_for("sparse_index").get_save_path(), type="sparse"))
 
 
 
@@ -26,7 +26,7 @@ class FlowBuilder(ContextMixin, BaseModel):
      
         self.doc_chunk.build_chunks(corpus)
         self.chunk_vdb.build_index(self.doc_chunk.get_chunks(), [], self.config.force_rebuild)
-        self.sparse_index
+        self.sparse_index.build_index(self.doc_chunk.get_chunks(), [], self.config.force_rebuild)
 
     def build_flow(self, params: T.Dict[str, T.Any], config: Config):
         """Build the appropriate flow based on parameters.
@@ -39,6 +39,8 @@ class FlowBuilder(ContextMixin, BaseModel):
         # get template
         template = get_template(params["template_name"])
         # build rag flow
+        import pdb
+        pdb.set_trace()
         retriever = get_retriever(params["rag_retriever"])
         self._build_rag_flow(params, response_synthesizer_llm, template)
     
