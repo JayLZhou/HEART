@@ -25,6 +25,16 @@ DEFAULT_LLMS: T.List[str] = list(
     )
 )
 
+PARAMETERS = [
+    "rag_retriever",
+    "reranker",
+    "rag_mode",
+    "sub_question_rag",
+    "response_synthesizer_llm",
+    "template_name",
+]
+
+
 Default_text_separator = [
     # Paragraph separators
     "\n\n",
@@ -145,3 +155,11 @@ TEMPLATE_NAMES = [
     "CoT",
     "finance-expert",
 ]
+
+
+class TunerType(Enum):
+    """Tuner type enumeration."""
+    BO = "bo"  # Bayesian Optimization
+    MAB = "mab"  # Multi-Armed Bandit
+    OTHER = "other"  # Other optimization methods
+    

@@ -1,7 +1,8 @@
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from typing import Any
 from Tuner.BasicTuner import BasicTuner
-class BasicBOTuner(ABC, BasicTuner):
+
+class BasicBOTuner(BasicTuner):
     def __init__(self):
         pass
 
@@ -11,11 +12,7 @@ class BasicBOTuner(ABC, BasicTuner):
         pass
 
     @abstractmethod
-    def objective(self):
-        pass
-
-    @abstractmethod
-    def evaluate(self):
+    def _evaluate(self):
         pass
 
     @abstractmethod

@@ -14,12 +14,8 @@ from Common.BaseFactory import GenericFactory
 from Common.Logger import logger
 from Tuner.BasicTuner import BasicTuner
 from Tuner.BOTuner.OptunaTuner import OptunaTuner
+from Common.Constants import TunerType
 
-class TunerType(Enum):
-    """Tuner type enumeration."""
-    BO = "bo"  # Bayesian Optimization
-    MAB = "mab"  # Multi-Armed Bandit
-    OTHER = "other"  # Other optimization methods
 
 
 class TunerFactory(GenericFactory):
@@ -30,41 +26,38 @@ class TunerFactory(GenericFactory):
             TunerType.BO: self._create_bo_tuner,
             TunerType.MAB: self._create_mab_tuner,
             TunerType.OTHER: self._create_other_tuner,
-      
+            
         }
         super().__init__(creators)
 
     def get_tuner(
         self,
         tuner_type: TunerType | str,
-        study_config=None,
+        config=None,
         **kwargs
     ) -> BasicTuner:
         """
         Get a tuner instance by type.
         
         Args:
-            tuner_type: Tuner type (TunerType enum or string)
-            study_config: Study configuration object
+            tuner_type: Tuner type (TunerType)
+            config: Configuration object
             **kwargs: Additional arguments for tuner creation
             
         Returns:
             BasicTuner: Tuner instance
-            
-        Examples:
-            >>> factory = TunerFactory()
-            >>> tuner = factory.get_tuner("bo", study_config=config)
-            >>> tuner = factory.get_tuner(TunerType.MAB, study_config=config)
+    
         """
-        return super().get_instance(tuner_type, study_config=study_config, **kwargs)
+     
+        return super().get_instance(tuner_type, config=config, **kwargs)
 
-    def _create_bo_tuner(self, study_config=None, **kwargs) -> BasicTuner:
+    def _create_bo_tuner(self, config=None, **kwargs) -> BasicTuner:
         """Create a Bayesian Optimization based tuner (Optuna)."""
-        if study_config is None:
+        if config is None:
             raise ValueError("study_config is required for BO tuner")
         
         logger.info("Creating BO-based tuner (Optuna)")
-        return OptunaTuner(study_config=study_config, **kwargs)
+        return OptunaTuner(config=config, **kwargs)
 
     def _create_mab_tuner(self, study_config=None, **kwargs) -> BasicTuner:
         """Create a Multi-Armed Bandit based tuner."""
@@ -124,6 +117,8 @@ class TunerFactory(GenericFactory):
             )
 
     def _raise_for_key(self, key: Any):
+        import pdb
+        pdb.set_trace()
         raise ValueError(
             f"Unknown tuner type: {key}. "
             f"Supported types: {', '.join([t.value for t in TunerType])}"
@@ -191,8 +186,7 @@ _tuner_factory = TunerFactory()
 
 
 def get_tuner(
-    tuner_type: TunerType | str,
-    study_config=None,
+    config,
     **kwargs
 ) -> BasicTuner:
     """
@@ -210,5 +204,6 @@ def get_tuner(
         >>> tuner = get_tuner("bo", study_config=config)
         >>> tuner = get_tuner(TunerType.MAB, study_config=config)
     """
-    return _tuner_factory.get_tuner(tuner_type, study_config=study_config, **kwargs)
+
+    return _tuner_factory.get_tuner(config.tuner_type, config=config, **kwargs)
 

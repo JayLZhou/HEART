@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 import typing as T
 from Common.Constants import TEMPLATE_NAMES, DEFAULT_LLMS
 from Config.RetrieverConfig import Retriever
@@ -40,9 +40,9 @@ class SearchSpace(BaseModel):
     hyde_enabled: T.List[bool] = Field(
         default_factory=lambda: [True, False], description="Whether HyDE is enabled."
     )
-
-  
-    _custom_defaults: ParamDict = {}
+    @model_validator(mode="before")
+    def set_defaults(self):
+        self._default_params = self._defaults()
 
     def _defaults(self) -> ParamDict:
         return {
@@ -50,17 +50,11 @@ class SearchSpace(BaseModel):
             "response_synthesizer_llm": self.response_synthesizer_llms[0],
             "reranker_enabled": False,
             **self.rag_retriever.defaults(),
-            **self.splitter.defaults()
         }
 
     def update_defaults(self, defaults: ParamDict) -> None:
         self._custom_defaults.update(defaults)
 
-    def defaults(self) -> ParamDict:
-        return {
-            **self._defaults(),
-            **self._custom_defaults,
-        }
 
     def param_names(
         self, params: T.Dict[str, T.Any] | T.List[str] | None = None
@@ -79,7 +73,6 @@ class SearchSpace(BaseModel):
         }
 
         distributions.update(self.rag_retriever.build_distributions())
-        distributions.update(self.splitter.build_distributions())
         if True in self.reranker_enabled:
             distributions.update(self.reranker.build_distributions())
 
@@ -92,42 +85,31 @@ class SearchSpace(BaseModel):
 
         return distributions
 
-    def sample(self, trial: Trial, parameters: T.List[str] = PARAMETERS) -> ParamDict:
+    def sample(self, trial: Trial, parameters: T.List[str]) -> ParamDict:
  
-        params: ParamDict = {
-            "few_shot_enabled": False,
-        }
-        defaults = self.defaults()
+        params: ParamDict = {}
 
-        if "rag_mode" in parameters:
-            params["rag_mode"] = trial.suggest_categorical("rag_mode", self.rag_modes)
-        else:
-            params["rag_mode"] = defaults["rag_mode"]
+
 
         if "template_name" in parameters:
             params["template_name"] = trial.suggest_categorical(
                 "template_name", self.template_names
             )
         else:
-            params["template_name"] = defaults["template_name"]
+            params["template_name"] = self._default_params["template_name"]
 
         if "response_synthesizer_llm" in parameters:
             params["response_synthesizer_llm"] = trial.suggest_categorical(
                 "response_synthesizer_llm", self.response_synthesizer_llms
             )
         else:
-            params["response_synthesizer_llm"] = defaults["response_synthesizer_llm"]
+            params["response_synthesizer_llm"] = self._default_params["response_synthesizer_llm"]
 
 
         if "rag_retriever" in parameters:
             params.update(**self.rag_retriever.sample(trial))
         else:
             params.update(**self.rag_retriever.defaults())
-
-        if "splitter" in parameters:
-            params.update(**self.splitter.sample(trial))
-        else:
-            params.update(**self.splitter.defaults())
 
         if "reranker" in parameters:
             params["reranker_enabled"] = trial.suggest_categorical(

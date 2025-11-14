@@ -1,9 +1,8 @@
 from pydantic import BaseModel, Field
-from Config.SearchSpace import *
 from Config.TopKConfig import TopK
 import typing as T
 from Common.Constants import DEFAULT_LLMS
-
+from Config.SearchSpaceMix import *
 class Reranker(BaseModel, SearchSpaceMixin):
     """
     Params:

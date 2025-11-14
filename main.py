@@ -51,7 +51,7 @@ def seed_everything(seed):
     torch.cuda.manual_seed_all(seed)
 
 
-def wrapper_tuning(config):
+def wrapper_tuning(config, tuner):
  
     logger.info("Starting sequential optimization")
 
@@ -61,7 +61,7 @@ def wrapper_tuning(config):
         logger.info("Running trial %d/%d", i+1, config.num_trials)
         try:
             trial = tuner.start()
-            result = tuner(config)
+            result = tuner(trial, [])
             tuner.backward(trial)
 
             results.append({
@@ -84,6 +84,7 @@ if __name__ == "__main__":
 
     tuner = get_tuner(config=opt, builder=builder)
     # Online RAG tuning
+
     wrapper_tuning(opt, tuner)
 
 

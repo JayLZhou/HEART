@@ -1,6 +1,6 @@
 from pydantic import BaseModel, ConfigDict, Field
 import typing as T
-from Schema.SearchSpace import PARAMETERS
+from Common.Constants import PARAMETERS
 
 
 class Block(BaseModel):

@@ -5,17 +5,8 @@ class BasicTuner(ABC):
     def __init__(self):
         pass
 
-
     @abstractmethod
     def _create_tuner(self):
-        pass
-
-    @abstractmethod
-    def objective(self):
-        pass
-
-    @abstractmethod
-    def evaluate(self):
         pass
 
     @abstractmethod

@@ -107,3 +107,7 @@ query:
     max_ir_steps: 2
     
  
+tuner:
+  name: tpebo
+  reuse_study: False
+  recreate_study: False

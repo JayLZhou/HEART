@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from Config import *
 from Common.Constants import CONFIG_ROOT, PROJECT_ROOT
 from Utils.YamlModel import YamlModel
-
+from Common.Constants import TunerType
 
 class WorkingParams(BaseModel):
     """Working parameters"""
@@ -26,13 +26,14 @@ class Config(WorkingParams, YamlModel):
     llm: LLMConfig
     exp_name: str = "default"
     num_trials: int = 10
-    
+
     # RAG Embedding
     embedding: EmbeddingConfig = EmbeddingConfig()
 
     # Basic Config
     force_rebuild: bool = False
     vdb_type: str = "vector"  # vector/colbert
+    tuner_type: TunerType = TunerType.BO
     token_model: str = "gpt-3.5-turbo"
     
     
@@ -47,6 +48,11 @@ class Config(WorkingParams, YamlModel):
 
     # Query Config 
     query: QueryConfig = QueryConfig()
+    
+
+
+    # Tuner Config
+    tuner: TunerConfig = TunerConfig()
   
     @classmethod
     def from_yaml_config(cls, path: str):
