@@ -3,9 +3,9 @@ import torch
 from transformers import AutoTokenizer
 from math import ceil
 from typing import List
-from syftr.Rerank.BasicRerank import BaseRanking
-from syftr.Schema.DocumentSchema import Document
-from syftr.Rerank.Models.Colbert import _insert_token, _colbert_score, ColBERTModel  # Assume you provide these helpers unchanged
+from Rerank.BasicRerank import BaseRanking
+from Schema.DocumentSchema import Document
+from Rerank.Models.Colbert import _insert_token, _colbert_score, ColBERTModel  # Assume you provide these helpers unchanged
 from tqdm import tqdm  # Import tqdm for progress tracking
 import copy
 
@@ -64,7 +64,7 @@ class ColBERTReranker(BaseRanking):
     def __init__(
         self,
         method: str = None,
-        model_name: str = None,
+        model_name: str = "colbert-ir/colbertv2.",
         api_key: str = None,
         **kwargs,
     ):        

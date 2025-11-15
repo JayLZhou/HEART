@@ -1,86 +1,77 @@
-# vector_index_bm25s.py
+# vector_index_bm25.py
 
 import os
 import asyncio
 import numpy as np
-import pickle
 from typing import Any, List
-from nltk.tokenize import word_tokenize
-import bm25s
 from Common.Utils import mdhash_id
 from Common.Logger import logger
 from llama_index.core.schema import Document
-from Index.BaseIndex import BaseIndex, VectorIndexNodeResult
-from llama_index.core.schema import MetadataMode
+from Index.BaseIndex import BaseIndex
 from llama_index.core.node_parser import SimpleNodeParser
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from llama_index.retrievers.bm25 import BM25Retriever
+from llama_index.core.storage.docstore import SimpleDocumentStore
+from llama_index.core import StorageContext
+from llama_index.core.schema import QueryBundle
 import Stemmer
 
+
 class BMIndex(BaseIndex):
-    """VectorIndex using bm25s implementation."""
+    """VectorIndex using llama_index BM25Retriever implementation."""
 
     def __init__(self, config):
         super().__init__(config)
-        self._bm25_index = None
-        self.max_workers = 16
-        self._raw_documents = []  # original texts
-        self._nodes = []  # store nodes for retrieval
-        self._docid_to_metadata = {}  # optional metadata map
+        self._retriever = None
+        self._docstore = None
+        self._nodes = []
 
     async def retrieval(self, query, top_k):
         if top_k is None:
             top_k = self._get_retrieve_top_k()
         
-        if self._bm25_index is None:
-            logger.warning("BM25 index is not initialized")
+        if self._retriever is None:
+            logger.warning("BM25 retriever is not initialized")
             return []
         
-        tokens = bm25s.tokenize(query.lower(), stopwords="en", stemmer=Stemmer.Stemmer("english"))
-        results, scores = self._bm25_index.retrieve(tokens, k=top_k)
+        # Create query bundle
+        query_bundle = QueryBundle(query_str=query)
         
+        # Retrieve nodes
+        retrieved_nodes = await self._retriever.aretrieve(query_bundle)
+        
+        # Format results
         retrieval_results = []
-        for idx, score in zip(results[0], scores[0]):
-            if idx < len(self._nodes):
-                node = self._nodes[idx]
-                retrieval_results.append({
-                    "text": node.get_content(metadata_mode=MetadataMode.EMBED),
-                    "score": float(score),
-                    "metadata": node.metadata
-                })
+        for node_with_score in retrieved_nodes[:top_k]:
+            retrieval_results.append({
+                "text": node_with_score.node.get_content(),
+                "score": node_with_score.score if node_with_score.score is not None else 0.0,
+                "metadata": node_with_score.node.metadata
+            })
+        
         return retrieval_results
 
-    async def retrieval_nodes(self, query, top_k, graph, need_score=False, tree_node=False):
-        results = await self.retrieval(query, top_k)
-        result = VectorIndexNodeResult(results)
-        if tree_node:
-            return await result.get_tree_node_data(graph, need_score)
-        else:
-            return await result.get_node_data(graph, need_score)
-
-
-
-    async def retrieval_nodes_with_score_matrix(self, query_list, top_k, graph):
-        if isinstance(query_list, str):
-            query_list = [query_list]
+    async def retrieval_batch(self, queries, top_k):
+        """Batch retrieval for multiple queries."""
+        if isinstance(queries, str):
+            queries = [queries]
+        
         results = await asyncio.gather(
-            *[self.retrieval_nodes(query, top_k, graph, need_score=True) for query in query_list])
-        reset_prob_matrix = np.zeros((len(query_list), graph.node_num))
-        entity_indices = []
-        scores = []
+            *[self.retrieval(query, top_k) for query in queries]
+        )
+        return results
 
-        async def set_idx_score(res):
-            for entity, score in zip(res[0], res[1]):
-                entity_indices.append(await graph.get_node_index(entity["entity_name"]))
-                scores.append(score)
+    
+    def get_retriever(self, top_k):
+        return BM25Retriever.from_defaults(
+            nodes=self._nodes,
+            similarity_top_k=top_k,
+            stemmer=Stemmer.Stemmer("english"),
+            language="english",
+        )
 
-        await asyncio.gather(*[set_idx_score(res) for res in results])
-        reset_prob_matrix[np.arange(len(query_list)).reshape(-1, 1), entity_indices] = scores
-        all_entity_weights = reset_prob_matrix.max(axis=0)
-        if all_entity_weights.sum() > 0:
-            all_entity_weights /= all_entity_weights.sum()
-        return all_entity_weights
 
     def _update_index(self, datas: List[dict[str, Any]], meta_data: List[str]):
+        """Build BM25 index from data."""
         def process_document(data):
             document = Document(
                 doc_id=data[0],
@@ -90,121 +81,102 @@ class BMIndex(BaseIndex):
             )
             return document
         
-        completed_list = []
-        with ThreadPoolExecutor(max_workers=self.max_workers) as pool:
-            for j in range(0, self.max_workers):
-                process_tasks = [pool.submit(process_document,
-                                         data=datas[i]) for i in range(len(datas)) if i % self.max_workers == j]
-                completed_list.extend(as_completed(process_tasks))
+        # Process documents
+        documents = [process_document(data) for data in datas]
         
-        documents = []                
-        for task in completed_list:
-            documents.append(task.result())
-        
+        # Parse documents into nodes
         parser = SimpleNodeParser.from_defaults()
         nodes = parser.get_nodes_from_documents(documents)
-        
-        # Store nodes for later retrieval
         self._nodes = nodes
         
-        # Store raw documents and metadata
-        self._raw_documents = [node.get_content(metadata_mode=MetadataMode.EMBED) for node in nodes]
-        for node in nodes:
-            doc_id = node.node_id
-            self._docid_to_metadata[doc_id] = node.metadata
-
+        # Create docstore
+        self._docstore = SimpleDocumentStore()
+        self._docstore.add_documents(nodes)
+        
+        # Get BM25 parameters
         k1 = getattr(self.config, "k1", 1.5)
         b = getattr(self.config, "b", 0.75)
-        self._bm25_index = bm25s.BM25(k1=k1, b=b)
+        
 
-        corpus_tokens = bm25s.tokenize(
-                self._raw_documents,
-                stopwords="en",
-                stemmer=Stemmer.Stemmer("english"),
-                show_progress=False,
-            )
-        self._bm25_index.index(corpus_tokens, show_progress=False)
-
+        
         logger.info(f"BM25 index built with k1={k1}, b={b}, size={len(documents)}.")
 
     def _load_index(self) -> bool:
+        """Load BM25 index from disk."""
         try:
-            index_path = os.path.join(self.config.persist_path, "bm25_index")
-            nodes_path = os.path.join(self.config.persist_path, "nodes.pkl")
-            metadata_path = os.path.join(self.config.persist_path, "metadata.pkl")
-            docs_path = os.path.join(self.config.persist_path, "raw_docs.pkl")
+            persist_path = self.config.persist_path
+            docstore_path = os.path.join(persist_path, "docstore.json")
             
-            if not os.path.exists(index_path):
-                logger.warning(f"BM25 index path does not exist: {index_path}")
+            if not os.path.exists(docstore_path):
+                logger.warning(f"BM25 docstore does not exist: {docstore_path}")
                 return False
             
-            # Load BM25 index
-            self._bm25_index = bm25s.BM25.load(index_path, mmap=False)
+            # Load storage context
+            storage_context = StorageContext.from_defaults(
+                persist_dir=persist_path
+            )
             
-            # Load nodes
-            if os.path.exists(nodes_path):
-                with open(nodes_path, "rb") as f:
-                    self._nodes = pickle.load(f)
+            self._docstore = storage_context.docstore
             
-            # Load metadata
-            if os.path.exists(metadata_path):
-                with open(metadata_path, "rb") as f:
-                    self._docid_to_metadata = pickle.load(f)
+            # Get nodes from docstore
+            nodes = list(self._docstore.docs.values())
+            self._nodes = nodes
             
-            # Load raw documents
-            if os.path.exists(docs_path):
-                with open(docs_path, "rb") as f:
-                    self._raw_documents = pickle.load(f)
+            if len(nodes) == 0:
+                logger.warning("No nodes found in docstore")
+                return False
             
-            logger.info(f"BM25 index loaded from {self.config.persist_path}, size={len(self._nodes)}")
+            
+            logger.info(f"BM25 index loaded from {persist_path}, size={len(nodes)}")
             return True
+            
         except Exception as e:
             logger.error(f"BM25 load failed: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
         return False
 
     def _get_retrieve_top_k(self):
+        """Get retrieval top-k parameter."""
         return self.config.retrieve_top_k
 
     def _storage_index(self):
-        os.makedirs(self.config.persist_path, exist_ok=True)
-        
-        # Save BM25 index
-        index_path = os.path.join(self.config.persist_path, "bm25_index")
-        if self._bm25_index is not None:
-            self._bm25_index.save(index_path)
-        
-        # Save nodes
-        nodes_path = os.path.join(self.config.persist_path, "nodes.pkl")
-        with open(nodes_path, "wb") as f:
-            pickle.dump(self._nodes, f)
-        
-        # Save metadata
-        metadata_path = os.path.join(self.config.persist_path, "metadata.pkl")
-        with open(metadata_path, "wb") as f:
-            pickle.dump(self._docid_to_metadata, f)
-        
-        # Save raw documents
-        docs_path = os.path.join(self.config.persist_path, "raw_docs.pkl")
-        with open(docs_path, "wb") as f:
-            pickle.dump(self._raw_documents, f)
-        
-        logger.info(f"BM25 index saved to {self.config.persist_path}, size={len(self._nodes)}")
-
-    async def upsert(self, data: dict[str, Any]):
-        pass
-
-    async def retrieval_batch(self, queries, top_k):
-        pass
+        """Save BM25 index to disk."""
+        try:
+            os.makedirs(self.config.persist_path, exist_ok=True)
+            
+            if self._docstore is None:
+                logger.warning("Docstore is None, cannot save")
+                return
+            
+            # Create storage context and persist
+            storage_context = StorageContext.from_defaults(docstore=self._docstore)
+            storage_context.persist(persist_dir=self.config.persist_path)
+            
+            logger.info(f"BM25 index saved to {self.config.persist_path}, size={len(self._nodes)}")
+            
+        except Exception as e:
+            logger.error(f"BM25 save failed: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
 
     def exist_index(self):
-        index_path = os.path.join(self.config.persist_path, "bm25_index")
-        return os.path.exists(index_path)
+        """Check if index exists on disk."""
+        docstore_path = os.path.join(self.config.persist_path, "docstore.json")
+        return os.path.exists(docstore_path)
 
     def _get_index(self):
+        """Get index object (not used for BM25)."""
         return None
 
+    async def upsert(self, data: dict[str, Any]):
+        """Upsert a document (not implemented yet)."""
+        pass
+
     async def _update_index_from_documents(self, docs: List[Document]):
+        """Update index from documents (not implemented yet)."""
         pass
 
     async def _similarity_score(self, object_q, object_d):
+        """Calculate similarity score (not needed for BM25)."""
         pass

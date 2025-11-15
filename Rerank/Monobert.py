@@ -3,8 +3,8 @@ from torch.cuda.amp import autocast
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 from typing import List
 from copy import deepcopy
-from syftr.Rerank.BasicRerank import BaseRanking
-from syftr.Schema.DocumentSchema import Document
+from Rerank.BasicRerank import BaseRanking
+from Schema.DocumentSchema import Document
 from tqdm import tqdm  # Import tqdm for progress tracking
 
 
@@ -52,7 +52,7 @@ class MonoBERT(BaseRanking):
             print(context.text)
         ```
     """ 
-    def __init__(self, method: str = None, model_name: str = None, api_key: str = None, **kwargs):
+    def __init__(self, method: str = None, model_name: str = "monobert-large", api_key: str = None, **kwargs):
         """
         Initializes **MonoBERT** for reranking tasks.
 

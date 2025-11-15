@@ -1,7 +1,6 @@
 from pydantic import BaseModel, Field
 from Config.TopKConfig import TopK
 import typing as T
-from Common.Constants import DEFAULT_LLMS
 from Config.SearchSpaceMix import *
 class Reranker(BaseModel, SearchSpaceMixin):
     """
@@ -15,8 +14,8 @@ class Reranker(BaseModel, SearchSpaceMixin):
         description="Configuration for the number of items to rerank.",
     )
     llms: T.List[str] = Field(
-        # ▼▼▼【修改点】在这里添加新的Reranker模型名称 ▼▼▼
-        default_factory=lambda: DEFAULT_LLMS + ["ColbertRanker", "Flashrank", "Echorank"],
+       
+        default_factory=lambda: ["upr", "flashrank", "monot5", "rankt5", "listt5", "transformer_ranker", "colbert_ranker", "twolar", "echorank", "monobert_ranker", "inranker"],
         description="List of LLMs or reranker models to be used for reranking.",
     )
 

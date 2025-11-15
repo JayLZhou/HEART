@@ -1,15 +1,14 @@
 
-from abc import ABC, abstractmethod
-from syftr.Schema.DocumentSchema import Document
+from abc import abstractmethod
+from Schema.DocumentSchema import Document
 from llama_index.core.postprocessor.types import BaseNodePostprocessor
 import typing as T
-from llama_index.core.query_engine import QueryBundle
-from llama_index.core.schema import NodeWithScore
+from llama_index.core.schema import NodeWithScore, QueryBundle
 from Common.Logger import logger
 import time
 from typing import List
 
-class BaseRanking(ABC, BaseNodePostprocessor):
+class BaseRanking(BaseNodePostprocessor):
     """
     An abstract base class for implementing different ranking models.
 

@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import typing as T
-from typing import Optional, List
+
+from Common.Constants import DEFAULT_LLMS
 from pydantic import BaseModel, Field
 from optuna import Trial
 from optuna.distributions import (
@@ -13,14 +14,6 @@ from optuna.distributions import (
 from Config.SearchSpaceMix import SearchSpaceMixin, ParamDict, get_dist_cardinality
 from Config.TopKConfig import TopK
 
-from Common.Constants import DEFAULT_EMBEDDING_MODELS
-
-# Import NON_REASONING_LLMS from Schema to avoid circular import
-try:
-    from Schema.SearchSpace import NON_REASONING_LLMS
-except ImportError:
-    # Fallback if Schema is not available
-    NON_REASONING_LLMS = ["gpt-4o-mini", "anthropic-haiku-35", "gemini-flash"]
 
 
 class Hybrid(BaseModel, SearchSpaceMixin):
@@ -54,7 +47,7 @@ class Hybrid(BaseModel, SearchSpaceMixin):
 
 class QueryDecomposition(BaseModel, SearchSpaceMixin):
     llm_names: T.List[str] = Field(
-        default_factory=lambda: NON_REASONING_LLMS,
+        default_factory=lambda: DEFAULT_LLMS,
         description="List of LLM names to be used for query decomposition.",
     )
     num_queries_min: int = Field(
@@ -125,10 +118,6 @@ class Retriever(BaseModel, SearchSpaceMixin):
         ],
         description="List of supported retrieval methods: dense (based on embedding models), sparse (BM25) or hybrid.",
     )
-    embedding_models: T.List[str] = Field(
-        default_factory=lambda: DEFAULT_EMBEDDING_MODELS,
-        description="List of embedding models for dense retrieval.",
-    )
     hybrid: Hybrid = Field(
         default_factory=Hybrid, description="Configuration for hybrid retrieval."
     )
@@ -147,7 +136,6 @@ class Retriever(BaseModel, SearchSpaceMixin):
     def defaults(self, prefix: str = "rag_") -> ParamDict:
         params = {
             f"{prefix}method": "dense",
-            f"{prefix}embedding_model": self.embedding_models[0],
             **self.top_k.defaults(prefix=prefix),
             **self.query_decomposition.defaults(prefix=prefix),
             **self.hybrid.defaults(prefix=prefix),
@@ -184,7 +172,6 @@ class Retriever(BaseModel, SearchSpaceMixin):
 
     def sample(self, trial: Trial, prefix: str = "") -> ParamDict:
         method = f"{prefix}method"
-        embedding_model = f"{prefix}embedding_model"
         use_query_decomp = f"{prefix}query_decomposition_enabled"
    
         params = {
@@ -195,10 +182,7 @@ class Retriever(BaseModel, SearchSpaceMixin):
             **self.top_k.sample(trial, prefix=prefix),
         }
 
-        if params[method] in ["dense", "hybrid"]:
-            params[embedding_model] = trial.suggest_categorical(
-                embedding_model, self.embedding_models
-            )
+      
         if params[method] == "hybrid":
             params.update(**self.hybrid.sample(trial, prefix=prefix))
 
@@ -216,8 +200,6 @@ class Retriever(BaseModel, SearchSpaceMixin):
             * len(self.methods)
             * len(self.query_decomposition_enabled)
         )
-        if "dense" in self.methods:
-            card *= len(self.embedding_models)
         if "hybrid" in self.methods:
             card *= self.hybrid.get_cardinality()
         if True in self.query_decomposition_enabled:

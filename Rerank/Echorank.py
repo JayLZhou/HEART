@@ -1,8 +1,8 @@
 import torch
 from transformers import pipeline
 from typing import List
-from syftr.Rerank.BasicRerank import BaseRanking
-from syftr.Schema.DocumentSchema import Document
+from Rerank.BasicRerank import BaseRanking
+from Schema.DocumentSchema import Document
 from tqdm import tqdm  # Import tqdm for progress tracking
 import copy
 

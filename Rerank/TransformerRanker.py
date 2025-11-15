@@ -1,6 +1,6 @@
-from syftr.Rerank.BasicRerank import BaseRanking
+from Rerank.BasicRerank import BaseRanking
 from typing import Union, List, Optional, Tuple
-from syftr.Schema.DocumentSchema import Document
+from Schema.DocumentSchema import Document
 import torch
 import copy
 from transformers import (
@@ -9,7 +9,7 @@ from transformers import (
 )
 from tqdm import tqdm  # Import tqdm for progress tracking
 
-from syftr.Rerank_Utils.Util import get_device,get_dtype
+from Rerank.Utils import get_device,get_dtype
 
 class TransformerRanker(BaseRanking):
     """
@@ -56,7 +56,7 @@ class TransformerRanker(BaseRanking):
         ```
     """
 
-    def __init__(self, method = None, model_name = None, api_key = None, **kwargs):
+    def __init__(self, method = None, model_name = "mxbai-rerank-xsmall", api_key = None, **kwargs):
         """
         Initializes **TransformerRanker** for reranking tasks.
 

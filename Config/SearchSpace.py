@@ -5,7 +5,6 @@ from Config.RetrieverConfig import Retriever
 from Config.TopKConfig import TopK
 from Config.RerankConfig import Reranker
 from Config.SearchSpaceMix import *
-from Config.QueryConfig import QueryConfig
 
 
 class SearchSpace(BaseModel):
@@ -37,9 +36,6 @@ class SearchSpace(BaseModel):
         default_factory=Reranker, description="Configuration for the reranker."
     )
 
-    sub_question: QueryConfig = Field(
-        default_factory=QueryConfig, description="Configuration for the sub-question."
-    )
 
 
 
@@ -110,11 +106,7 @@ class SearchSpace(BaseModel):
         else:
             params['reranker']["reranker_enabled"] = False
 
-        
-        if "sub_question" in parameters:
-            params['sub_question'] = self.sub_question.sample(trial)
-        else:
-            params['sub_question'] = self.sub_question.defaults()
+
         return params
 
     def get_cardinality(self) -> int:

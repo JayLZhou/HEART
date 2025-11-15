@@ -5,11 +5,11 @@ import numpy
 import torch
 from transformers import T5Tokenizer, T5ForConditionalGeneration
 from transformers import AutoTokenizer, AutoModelForCausalLM
-from syftr.Schema.DocumentSchema import Document
+from Schema.DocumentSchema import Document
 from typing import List
 from transformers import logging
 logging.set_verbosity_error()
-from syftr.Rerank.BasicRerank import BaseRanking
+from Rerank.BasicRerank import BaseRanking
 from tqdm import tqdm  # Import tqdm for progress tracking
 import copy
 

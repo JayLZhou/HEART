@@ -4,8 +4,8 @@ import numpy as np
 import os
 from pathlib import Path
 from transformers import T5ForConditionalGeneration, T5Tokenizer
-from syftr.Rerank.BasicRerank import BaseRanking
-from syftr.Schema.DocumentSchema import Document
+from Rerank.BasicRerank import BaseRanking
+from Schema.DocumentSchema import Document
 from typing import List
 import copy
 from tqdm import tqdm  # Import tqdm for progress tracking

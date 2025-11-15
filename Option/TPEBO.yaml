@@ -32,15 +32,7 @@ retriever:
     - sparse
     - hybrid
   
-  # Embedding models for dense retrieval
-  embedding_models:
-    - BAAI/bge-small-en-v1.5
-    - BAAI/bge-large-en-v1.5
-    - thenlper/gte-large
-    - mixedbread-ai/mxbai-embed-large-v1
-    - WhereIsAI/UAE-Large-V1
-    - sentence-transformers/all-MiniLM-L12-v2
-    - BAAI/bge-base-en-v1.5
+
   
   # Hybrid retrieval configuration (BM25 + Dense)
   hybrid:

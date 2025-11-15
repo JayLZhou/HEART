@@ -6,8 +6,9 @@ from Common.ContextMixin import ContextMixin
 from Option.Config2 import Config
 from pydantic import BaseModel
 from Prompt import get_template
-# from Pipeline.RAGFlow import RAGFlow
-
+from llama_index.core.retrievers import QueryFusionRetriever
+from llama_index.core.retrievers.fusion_retriever import FUSION_MODES
+from Rerank import get_reranker
 class FlowBuilder(ContextMixin, BaseModel):
     """Builds different types of flows based on configuration."""
     
@@ -40,35 +41,43 @@ class FlowBuilder(ContextMixin, BaseModel):
         template = get_template(params["template_name"])
         # build rag flow
         import pdb
+        retrievers = self.get_retriever(params["rag_retriever"])
+        # get reranker
         pdb.set_trace()
-        retriever = get_retriever(params["rag_retriever"])
-        self._build_rag_flow(params, response_synthesizer_llm, template)
+        reranker = get_reranker(params["reranker"])
+    
+        self._flow =  RAGFlow(**common_args)
     
 
-    
-    def _build_rag_flow(self, params: T.Dict[str, T.Any], response_synthesizer_llm, template):
-        """Build RAG-based flow."""
-       
-   
-     
-        reranker_top_k = params.get("reranker_top_k") if params.get("reranker_enabled") else None
-        import pdb
-        pdb.set_trace()
-   
-        
-        # Build specific RAG flow type
-  
-        common_args = {
-            "retriever": rag_retriever,
-            "response_synthesizer_llm": response_synthesizer_llm,
-            "template": template,
-            "reranker_top_k": reranker_top_k,
-            "params": params,
+    def get_retriever(self, params):
+        retrievers = []
+        if params["method"] == "dense" or params["method"] == "hybrid":
+            retrievers.append(self.chunk_vdb.get_retriever(params["top_k"]))
+        if params["method"] == "sparse" or params["method"] == "hybrid":
+            retrievers.append(self.sparse_index.get_retriever(params["top_k"]))
+        if params["method"] == "hybrid":
+            hybrid_bm25_weight = float(params["hybrid_bm25_weight"])
+            retriever_weights = [hybrid_bm25_weight, 1 - hybrid_bm25_weight]
+        else:
+            return retrievers[0]
+
+        fusion_retriever_params = {
+            "llm": None,
+            "mode": FUSION_MODES(params["fusion_mode"]),
+            "use_async": False,
+            "verbose": True,
+            "similarity_top_k": params["top_k"],
+            "num_queries": 1,
+            "retriever_weights": retriever_weights,
+            "retrievers": retrievers,
         }
-        
-        import pdb
-        pdb.set_trace()
-    
-        self.flow =  RAGFlow(**common_args)
+        if params["query_decomposition_enabled"] == True:
+            fusion_retriever_params.update(
+                        **{
+                            "llm": params["query_decomposition_llm_name"],
+                            "num_queries": params["query_decomposition_num_queries"],
+                        }
+                    )
+        return  QueryFusionRetriever(**fusion_retriever_params)
 
       

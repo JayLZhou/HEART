@@ -8,7 +8,7 @@ from llama_index.core.schema import (
     TextNode
 )
 from llama_index.core import StorageContext, load_index_from_storage, VectorStoreIndex, Settings
-from Index.BaseIndex import BaseIndex, VectorIndexNodeResult, VectorIndexEdgeResult
+from Index.BaseIndex import BaseIndex
 from llama_index.core.node_parser import SimpleNodeParser
 from llama_index.core.schema import QueryBundle
 import numpy as np
@@ -34,20 +34,8 @@ class FaissIndex(BaseIndex):
     
         return retriever.aretrieve(query_bundle)
 
-    def retrieval_nodes(self, query, top_k, graph, need_score=False, tree_node=False):
-        results = self.retrieval(query, top_k)
-        result = VectorIndexNodeResult(results)
-        if tree_node:
-            return result.get_tree_node_data(graph, need_score)
-        else:
-            return result.get_node_data(graph, need_score)
-
-    def retrieval_edges(self, query, top_k, graph, need_score=False):
-
-        results = self.retrieval(query, top_k)
-        result = VectorIndexEdgeResult(results)
-
-        return result.get_edge_data(graph, need_score)
+    def get_retriever(self, top_k):
+        return self._index.as_retriever(similarity_top_k=top_k, embed_model=self.config.embed_model)
 
     def retrieval_batch(self, queries, top_k):
         pass
@@ -144,23 +132,4 @@ class FaissIndex(BaseIndex):
         # For llama_index based vector database, we do not need it now!
         pass
 
-    def retrieval_nodes_with_score_matrix(self, query_list, top_k, graph):
-        if isinstance(query_list, str):
-            query_list = [query_list]
-        results = [self.retrieval_nodes(query, top_k, graph, need_score=True) for query in query_list]
-        reset_prob_matrix = np.zeros((len(query_list), graph.node_num))
-        entity_indices = []
-        scores = []
-
-        def set_idx_score(idx, res):
-            for entity, score in zip(res[0], res[1]):
-                entity_indices.append(graph.get_node_index(entity["entity_name"]))
-                scores.append(score)
-
-        [set_idx_score(idx, res) for idx, res in enumerate(results)]
-        reset_prob_matrix[np.arange(len(query_list)).reshape(-1, 1), entity_indices] = scores
-        all_entity_weights = reset_prob_matrix.max(axis=0)  # (1, #all_entities)
-
-        # Normalize the scores
-        all_entity_weights /= all_entity_weights.sum()
-        return all_entity_weights
+   

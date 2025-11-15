@@ -1,13 +1,12 @@
 import logging
-import math
-from typing import List, Tuple, Union, Optional
-from transformers import T5ForConditionalGeneration, T5Tokenizer, GenerationConfig
-from syftr.Rerank.BasicRerank import BaseRanking
-from syftr.Schema.DocumentSchema import Document
-from syftr.Schema.ChunkSchema import TextChunk
-from syftr.Rerank_Utils.Util import get_device, get_dtype
+from typing import List
+from transformers import T5ForConditionalGeneration, T5Tokenizer
+from Rerank.BasicRerank import BaseRanking
+from Schema.DocumentSchema import Document
+from Schema.ChunkSchema import TextChunk
+from Rerank.Utils import get_device, get_dtype
 import torch
-from syftr.Rerank_Utils.PredefinedModels import PREDICTION_TOKENS
+from Rerank.Utils import PREDICTION_TOKENS
 logger = logging.getLogger(__name__)
 from tqdm import tqdm  # Import tqdm for progress tracking
 
@@ -65,7 +64,7 @@ class MonoT5(BaseRanking):
         ```
     """
 
-    def __init__(self, method=None, model_name=None, **kwargs):
+    def __init__(self, method=None, model_name="monot5-base-msmarco", **kwargs):
         """
         Initializes **MonoT5** for reranking tasks.
 

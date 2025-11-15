@@ -6,7 +6,7 @@ from llama_index.core.schema import (
     Document
 )
 from llama_index.core import StorageContext, load_index_from_storage, VectorStoreIndex, Settings
-from Index.BaseIndex import BaseIndex, VectorIndexNodeResult, VectorIndexEdgeResult
+from Index.BaseIndex import BaseIndex
 from llama_index.core.node_parser import SimpleNodeParser
 from llama_index.core.schema import QueryBundle
 import numpy as np
@@ -29,20 +29,9 @@ class VectorIndex(BaseIndex):
 
         return retriever.aretrieve(query_bundle)
 
-    def retrieval_nodes(self, query, top_k, graph, need_score=False, tree_node=False):
-        results = self.retrieval(query, top_k)
-        result = VectorIndexNodeResult(results)
-        if tree_node:
-            return result.get_tree_node_data(graph, need_score)
-        else:
-            return result.get_node_data(graph, need_score)
 
-    def retrieval_edges(self, query, top_k, graph, need_score=False):
 
-        results = self.retrieval(query, top_k)
-        result = VectorIndexEdgeResult(results)
 
-        return result.get_edge_data(graph, need_score)
 
     def retrieval_batch(self, queries, top_k):
         pass

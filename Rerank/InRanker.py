@@ -4,9 +4,9 @@ from typing import List
 import torch
 from tqdm.auto import tqdm
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
-from syftr.Rerank.BasicRerank import BaseRanking
-from syftr.Schema.DocumentSchema import Document
-from syftr.Schema.ChunkSchema import TextChunk
+from Rerank.BasicRerank import BaseRanking
+from Schema.DocumentSchema import Document
+from Schema.ChunkSchema import TextChunk
 
 import copy
 from tqdm import tqdm  # Import tqdm for progress tracking
@@ -71,7 +71,7 @@ class InRanker(BaseRanking):
         - Supports **batch processing** for efficiency.
         - Works in **zero-shot retrieval** scenarios without fine-tuning.
     """
-    def __init__(self, method: str= None, model_name: str= None, api_key: str= None, **kwargs) ->None:
+    def __init__(self, method: str= None, model_name: str= "inranker-small", api_key: str= None, **kwargs) ->None:
         """
         Initializes **InRanker** for **zero-shot document reranking**.
 

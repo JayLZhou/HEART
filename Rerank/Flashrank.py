@@ -3,17 +3,17 @@ from pathlib import Path
 from tokenizers import AddedToken, Tokenizer
 import onnxruntime as ort
 import numpy as np
-from syftr.Schema.DocumentSchema import Document
+from Schema.DocumentSchema import Document
 
 import os
 import zipfile
 import requests
 from tqdm import tqdm
-from syftr.Rerank_Utils.PredefinedModels import HF_PRE_DEFIND_MODELS
+from Rerank.Utils import HF_PRE_DEFIND_MODELS
 import collections
 from typing import List, Dict
 import logging
-from syftr.Rerank.BasicRerank import BaseRanking
+from Rerank.BasicRerank import BaseRanking
 from tqdm import tqdm  # Import tqdm for progress tracking
 
 import copy
@@ -73,7 +73,7 @@ class FlashRanker(BaseRanking):
         - Integrated into the `Reranking` class, so use `Reranking` instead of `FlashRanker` directly.
     """
 
-    def __init__(self, method: str = None, model_name: str = None, api_key: str = None, **kwargs):
+    def __init__(self, method: str = None, model_name: str = "ms-marco-TinyBERT-L-2-v2", api_key: str = None, **kwargs):
         """
         Initializes the FlashRanker model for reranking.
 

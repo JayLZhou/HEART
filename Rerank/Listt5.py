@@ -1,11 +1,11 @@
 import torch
 from transformers import T5Tokenizer
-from syftr.Rerank.BasicRerank import BaseRanking
-from syftr.Schema.DocumentSchema import Document
+from Rerank.BasicRerank import BaseRanking
+from Schema.DocumentSchema import Document
 from typing import List
 import copy
 
-from syftr.Rerank.Models.Fidt5 import FiDT5
+from Rerank.Models.Fidt5 import FiDT5
 from tqdm import tqdm  # Import tqdm for progress tracking
 
 
@@ -68,7 +68,7 @@ class ListT5(BaseRanking):
         - Supports **batch processing** for large-scale reranking tasks.
     """
 
-    def __init__(self, method: str = None, model_name: str = None, api_key: str = None,  **kwargs):
+    def __init__(self, method: str = None, model_name: str = "listt5-base", api_key: str = None,  **kwargs):
         """
         Initializes **ListT5** for **listwise document reranking**.
 

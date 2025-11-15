@@ -1,9 +1,9 @@
 import torch
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
-from syftr.Rerank.BasicRerank import BaseRanking
-from syftr.Schema.DocumentSchema import Document
+from Rerank.BasicRerank import BaseRanking
+from Schema.DocumentSchema import Document
 from typing import List
-from syftr.Rerank.Models.Twolar import Score
+from Rerank.Models.Twolar import Score
 import copy
 from tqdm import tqdm  # Import tqdm for progress tracking
 
@@ -57,7 +57,7 @@ class TWOLAR(BaseRanking):
         ```
     """
 
-    def __init__(self, method: str = None, model_name: str = None, api_key: str = None, **kwargs):
+    def __init__(self, method: str = None, model_name: str = "twolar-xl", api_key: str = None, **kwargs):
         """
         Initializes **TWOLAR** for reranking tasks.
 

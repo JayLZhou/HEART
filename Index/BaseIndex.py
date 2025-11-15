@@ -2,7 +2,7 @@ import os
 from abc import ABC, abstractmethod
 from Common.Utils import clean_storage
 from Common.Logger import logger
-from Schema.VdbResult import * 
+
 
 class BaseIndex(ABC):
     def __init__(self, config):
@@ -73,10 +73,5 @@ class BaseIndex(ABC):
     def clean_index(self):
        clean_storage(self.config.persist_path)
        
-    @abstractmethod
-    def retrieval_nodes(self, query, top_k, graph):
-        pass
+  
 
-
-    def retrieval_nodes_with_score_matrix(self, query_list, top_k, graph):
-        pass
