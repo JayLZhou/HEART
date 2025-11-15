@@ -62,7 +62,7 @@ class FlowBuilder(ContextMixin, BaseModel):
             return retrievers[0]
 
         fusion_retriever_params = {
-            "llm": None,
+            "llm": self.llm,
             "mode": FUSION_MODES(params["fusion_mode"]),
             "use_async": False,
             "verbose": True,
@@ -72,12 +72,13 @@ class FlowBuilder(ContextMixin, BaseModel):
             "retrievers": retrievers,
         }
         if params["query_decomposition_enabled"] == True:
+            query_decomposition_llm = self.get_llm(params["query_decomposition_llm_name"])
             fusion_retriever_params.update(
-                        **{
-                            "llm": params["query_decomposition_llm_name"],
-                            "num_queries": params["query_decomposition_num_queries"],
-                        }
-                    )
+                **{
+                    "llm": query_decomposition_llm,
+                    "num_queries": params["query_decomposition_num_queries"],
+                }
+            )
         return  QueryFusionRetriever(**fusion_retriever_params)
 
       

@@ -56,7 +56,7 @@ class EchoRankReranker(BaseRanking):
             print(context.text)
         ```
     """
-    def __init__(self, method=None, model_name=None, **kwargs):
+    def __init__(self, method=None, model_name="google/flan-t5-large", **kwargs):
         """
         Initializes the **EchoRankReranker** instance.
 

@@ -12,7 +12,7 @@ from tqdm import tqdm
 from Rerank.Utils import HF_PRE_DEFIND_MODELS
 import collections
 from typing import List, Dict
-import logging
+from Common.Logger import logger
 from Rerank.BasicRerank import BaseRanking
 from tqdm import tqdm  # Import tqdm for progress tracking
 
@@ -87,10 +87,7 @@ class FlashRanker(BaseRanking):
             ValueError: If an invalid model name is provided or model files are missing.
         """
         max_length: int = 512
-        log_level: str = "INFO"
-        
-        logging.basicConfig(level=getattr(logging, log_level.upper(), logging.INFO))
-        self.logger = logging.getLogger(__name__)
+
         model_dir = kwargs.get("model_dir", None)
         # Predefined FlashRank models
         available_models = HF_PRE_DEFIND_MODELS['flashrank']
@@ -118,7 +115,7 @@ class FlashRanker(BaseRanking):
         if not self.model_dir.exists():
             if model_dir:
                 raise FileNotFoundError(f"Custom model directory '{self.model_dir}' not found.")
-            self.logger.info(f"Downloading model '{model_name}'...")
+            logger.info(f"Downloading model '{model_name}'...")
             self._download_model_files(model_name)
 
         listwise_rankers = {'rank_zephyr_7b_v1_full'}
@@ -147,11 +144,11 @@ class FlashRanker(BaseRanking):
             model_name (str): The name of the model to be prepared.
         """
         if not self.cache_dir.exists():
-            self.logger.debug(f"Cache directory {self.cache_dir} not found. Creating it..")
+            logger.debug(f"Cache directory {self.cache_dir} not found. Creating it..")
             self.cache_dir.mkdir(parents=True, exist_ok=True)
         
         if not self.model_dir.exists():
-            self.logger.info(f"Downloading {model_name}...")
+            logger.info(f"Downloading {model_name}...")
             self._download_model_files(model_name)
 
     def _download_model_files(self, model_name: str):
@@ -304,7 +301,7 @@ class FlashRanker(BaseRanking):
             ImportError: If `llama_cpp` is not installed for GGUF-based listwise reranking.
         """
         if self.llm_model is not None:
-            self.logger.debug("Running listwise ranking..")
+            logger.debug("Running listwise ranking..")
             num_of_passages = len(passages)
             messages = self._get_prefix_prompt(query, num_of_passages)
 
@@ -345,7 +342,7 @@ class FlashRanker(BaseRanking):
             List[Document]: Passages sorted in descending order of relevance.
         """
         passages_copy = copy.deepcopy(passages)
-        self.logger.debug("Running pairwise ranking..")
+        logger.debug("Running pairwise ranking..")
         query_passage_pairs = [[query, passage.text] for passage in passages_copy]
 
         input_text = self.tokenizer.encode_batch(query_passage_pairs)

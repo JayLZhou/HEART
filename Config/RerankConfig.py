@@ -21,13 +21,13 @@ class Reranker(BaseModel, SearchSpaceMixin):
 
     def defaults(self, prefix: str = "") -> T.Dict[str, T.Any]:
         return {
-            f"{prefix}reranker_llm_name": self.llms[0],
-            **self.top_k.defaults(prefix=f"{prefix}reranker_"),
+            f"{prefix}reranker_name": self.llms[0],
+            **self.top_k.defaults(prefix=f"{prefix}"),
         }
 
     def build_distributions(self, prefix: str = "") -> T.Dict[str, BaseDistribution]:
         return {
-            f"{prefix}reranker_llm_name": CategoricalDistribution(self.llms),
+            f"{prefix}reranker_name": CategoricalDistribution(self.llms),
             **self.top_k.build_distributions(prefix=f"{prefix}reranker_"),
         }
 

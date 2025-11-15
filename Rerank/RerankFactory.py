@@ -28,10 +28,10 @@ METHOD_MAP = {
 
 
 
-def get_reranker(method: str, api_key: str = None, top_k: int = 5, **kwargs):
+def get_reranker(params):
     """Factory method to create a reranker instance"""
-    if method not in METHOD_MAP:
-        raise ValueError(f"Unknown reranker method: {method}. Available: {list(METHOD_MAP.keys())}")
-    return METHOD_MAP[method](api_key=api_key, top_k=top_k, **kwargs)
+    if params["reranker_name"] not in METHOD_MAP:
+        raise Exception(f"Unknown reranker method: {params['reranker_name']}.")
+    return METHOD_MAP[params["reranker_name"]](method=params["reranker_name"])
 
 
