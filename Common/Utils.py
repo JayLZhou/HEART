@@ -1,11 +1,10 @@
 from hashlib import md5
 import re
-from colorama import Fore, Style, init
+from colorama import Fore, Style
 from pyfiglet import Figlet
 import shutil
-import io
 import os
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any
 from Common.Logger import logger
 from tenacity import RetryCallState
 
@@ -176,3 +175,13 @@ def prase_json_from_response(response: str) -> dict:
         logger.info("JSON data successfully extracted.")
 
     return extracted_values
+
+
+def extract_answer(response: str) -> str:
+    """
+    Extract the answer from the response.
+    """
+    if "Answer:" in response:
+        return response.split("Answer: ")[1].strip()
+    else:
+        return response

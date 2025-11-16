@@ -82,12 +82,11 @@ class QueryFusionRetriever(BaseRetriever):
             num_queries=self.num_queries - 1,
             query=original_query,
         )
-        import pdb
-        pdb.set_trace()
-        response = self._llm.complete(prompt_str)
-
+  
+        response = self._llm.ask(prompt_str)
+   
         # Strip code block and assume LLM properly put each query on a newline
-        queries = response.text.strip("`").split("\n")
+        queries = response.strip("`").split("\n")
         queries = [q.strip() for q in queries if q.strip()]
         if self._verbose:
             queries_str = "\n".join(queries)
@@ -261,6 +260,7 @@ class QueryFusionRetriever(BaseRetriever):
 
     def _retrieve(self, query_bundle: QueryBundle) -> List[NodeWithScore]:
         queries: List[QueryBundle] = [query_bundle]
+    
         if self.num_queries > 1:
             queries.extend(self._get_queries(query_bundle.query_str))
 

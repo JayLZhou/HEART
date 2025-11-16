@@ -160,7 +160,7 @@ class MonoT5(BaseRanking):
         """
         
         for doc in tqdm(documents, desc="Reranking Documents"):
-            query = doc.question.question
+            query = doc.question
             prompts = [self.inputs_template.format(query=query, text=context.text) for context in doc.contexts]
             scores = self._get_scores(query, [context.text for context in doc.contexts])
             contexts = copy.deepcopy(doc.contexts)

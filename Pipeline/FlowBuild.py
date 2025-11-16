@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from Prompt import get_template
 from Index.FusionRetriever import QueryFusionRetriever, FUSION_MODES
 from Rerank import get_reranker
+from Pipeline.RAGFlow import RAGFlow
 class FlowBuilder(ContextMixin, BaseModel):
     """Builds different types of flows based on configuration."""
     
@@ -28,24 +29,25 @@ class FlowBuilder(ContextMixin, BaseModel):
         self.chunk_vdb.build_index(self.doc_chunk.get_chunks(), [], self.config.force_rebuild)
         self.sparse_index.build_index(self.doc_chunk.get_chunks(), [], self.config.force_rebuild)
 
-    def build_flow(self, params: T.Dict[str, T.Any], config: Config):
+    def build_flow(self, params: T.Dict[str, T.Any]):
         """Build the appropriate flow based on parameters.
         Only focus on online flow building.
         """
-  
-
         # get response synthesizer llm
         response_synthesizer_llm = self.get_llm(params["response_synthesizer_llm"])
         # get template
         template = get_template(params["template_name"])
-        # build rag flow
-        import pdb
-        retrievers = self.get_retriever(params["rag_retriever"])
+        # get retriever
+        retriever = self.get_retriever(params["rag_retriever"])
         # get reranker
-        
         reranker = get_reranker(params["reranker"])
-    
-        self._flow =  RAGFlow(**common_args)
+        # build rag flow
+        return RAGFlow(
+            response_synthesizer_llm=response_synthesizer_llm,
+            template=template,
+            retriever=retriever,
+            reranker=reranker,
+        )
     
 
     def get_retriever(self, params):
@@ -78,6 +80,7 @@ class FlowBuilder(ContextMixin, BaseModel):
                     "num_queries": params["query_decomposition_num_queries"],
                 }
             )
+   
         return  QueryFusionRetriever(**fusion_retriever_params)
 
       

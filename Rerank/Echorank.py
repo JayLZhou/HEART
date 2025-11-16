@@ -143,7 +143,7 @@ Output Passage A or Passage B."""
             ```
         """
         for document in tqdm(documents, desc="Reranking Documents"):
-            query = document.question.question
+            query = document.question
             contexts = document.contexts
 
             # Stage 1: Binary Classification

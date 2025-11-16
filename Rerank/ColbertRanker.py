@@ -118,7 +118,7 @@ class ColBERTReranker(BaseRanking):
             ```
         """
         for document in tqdm(documents, desc="Reranking Documents"):
-            query = document.question.question
+            query = document.question
             if not document.contexts:
                 # Skip document if no valid contexts
                 print(f"[SKIP] Document skipped — no valid contexts. Query: '{query}'")

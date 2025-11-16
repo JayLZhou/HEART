@@ -13,6 +13,7 @@ from tqdm import tqdm
 from Common.Logger import logger
 from Pipeline.FlowBuild import FlowBuilder
 from Tuner.TunerFactory import get_tuner
+from Utils.Evaluation import Evaluator
 parser = argparse.ArgumentParser()
 parser.add_argument("-opt", type=str, help="Path to option YMAL file.")
 parser.add_argument("-dataset_name", type=str, help="Name of the dataset.")
@@ -54,23 +55,19 @@ def seed_everything(seed):
 def wrapper_tuning(tuner):
  
     logger.info("Starting RAG tuning: query level")
-
-    results = []
-    
-    for i in tqdm(range(num_trials), desc="Running trials"):
-        logger.info("Running trial %d/%d", i+1, num_trials)
-        try:
-            # trial = tuner.start()
-            result = tuner()
-            # tuner.backward(trial)
-
-            results.append({
-                study_config.optimization.objective_1_name: obj_1,
-            })
-        except Exception as e:
-            logger.error(f"Trial %d failed with error: {str(e)}", i+1)
-            continue
-    
+    dataset_len = len(dataset)
+    dataset_len = 1
+    for _, idx in enumerate(range(dataset_len)):
+        results = []
+        query = dataset[idx]
+        for i in tqdm(range(num_trials), desc="Running trials"):
+            logger.info("Running trial %d/%d", i+1, num_trials)
+            try:
+                result = tuner(query = query)
+            except Exception as e:
+                logger.error(f"Trial %d failed with error: {str(e)}", i+1)
+                continue
+        results.append(result)        
 
 
 if __name__ == "__main__":
@@ -81,10 +78,10 @@ if __name__ == "__main__":
     # Offline indexing
     corpus = dataset.get_corpus()
     builder.build_indexing(corpus)
+    evaluator = Evaluator(eval_path=os.path.join(opt.working_dir, opt.exp_name, "Results", "results.json"), dataset_name=opt.dataset_name)
 
-    tuner = get_tuner(config=opt, builder=builder)
+    tuner = get_tuner(config=opt, builder=builder, evaluator=evaluator)
     # Online RAG tuning
-
     wrapper_tuning(tuner)
 
 

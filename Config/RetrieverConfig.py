@@ -182,7 +182,7 @@ class Retriever(BaseModel, SearchSpaceMixin):
             **self.top_k.sample(trial, prefix=prefix),
         }
 
-      
+        params[method] = "hybrid" # for debugging
         if params[method] == "hybrid":
             params.update(**self.hybrid.sample(trial, prefix=prefix))
 

@@ -63,7 +63,7 @@ class BaseLLM(ABC):
 
     def format_msg(self, messages: Union[str, Message, list[dict], list[Message], list[str]]) -> list[dict]:
         """convert messages to list[dict]."""
-        from Core.Schema.Message import Message
+        from Schema.Message import Message
 
         if not isinstance(messages, list):
             messages = [messages]
@@ -117,6 +117,81 @@ class BaseLLM(ABC):
             return Costs(0, 0, 0, 0)
         return self.cost_manager.get_last_stage_cost()
 
+    def ask(
+        self,
+        msg: Union[str, list[dict[str, str]]],
+        system_msgs: Optional[list[str]] = None,
+        format_msgs: Optional[list[dict[str, str]]] = None,
+        images: Optional[Union[str, list[str]]] = None,
+        timeout=USE_CONFIG_TIMEOUT,
+        stream=None,
+        max_tokens = None,
+        format = "text",
+    ) -> str:
+        """
+        Synchronous version of aask. Queries the LLM and returns a response.
+
+        Args:
+            msg (Union[str, list[dict[str, str]]]): User message or list of messages.
+            system_msgs (Optional[list[str]]): System prompts to prepend.
+            format_msgs (Optional[list[dict[str, str]]]): Additional formatted messages.
+            images (Optional[Union[str, list[str]]]): Images for multimodal models.
+            timeout: Request timeout (default: USE_CONFIG_TIMEOUT).
+            stream: Whether to use streaming mode (default: None, uses config).
+            max_tokens: Maximum tokens in response.
+            format: Response format ("text", "json", etc.).
+
+        Returns:
+            str: The LLM's response text.
+        """
+        import asyncio
+        
+        # Build message list
+        if system_msgs:
+            message = self._system_msgs(system_msgs)
+        else:
+            message = [self._default_system_msg()]
+        if not self.use_system_prompt:
+            message = []
+        if format_msgs:
+            message.extend(format_msgs)
+        if isinstance(msg, str):
+            message.append(self._user_msg(msg, images=images))
+        else:
+            message.extend(msg)
+        if stream is None:
+            stream = self.config.stream
+        
+        # Run async method in sync context
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # If already in async context, create a task
+                raise RuntimeError(
+                    "Cannot call synchronous 'ask' from within an async context. "
+                    "Use 'await aask()' instead."
+                )
+        except RuntimeError:
+            # No event loop exists, create a new one
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
+        try:
+            rsp = loop.run_until_complete(
+                self.acompletion_text(
+                    message, 
+                    stream=stream, 
+                    timeout=self.get_timeout(timeout), 
+                    max_tokens=max_tokens, 
+                    format=format
+                )
+            )
+            return rsp
+        finally:
+            # Clean up if we created a new loop
+            if not loop.is_running():
+                pass  # Keep the loop for future use
+
     async def aask(
         self,
         msg: Union[str, list[dict[str, str]]],
@@ -128,6 +203,22 @@ class BaseLLM(ABC):
         max_tokens = None,
         format = "text",
     ) -> str:
+        """
+        Asynchronous version of ask. Queries the LLM and returns a response.
+
+        Args:
+            msg (Union[str, list[dict[str, str]]]): User message or list of messages.
+            system_msgs (Optional[list[str]]): System prompts to prepend.
+            format_msgs (Optional[list[dict[str, str]]]): Additional formatted messages.
+            images (Optional[Union[str, list[str]]]): Images for multimodal models.
+            timeout: Request timeout (default: USE_CONFIG_TIMEOUT).
+            stream: Whether to use streaming mode (default: None, uses config).
+            max_tokens: Maximum tokens in response.
+            format: Response format ("text", "json", etc.).
+
+        Returns:
+            str: The LLM's response text.
+        """
         if system_msgs:
             message = self._system_msgs(system_msgs)
         else:

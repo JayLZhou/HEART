@@ -11,8 +11,8 @@ from Rerank.Monobert import MonoBERT
 from Rerank.InRanker import InRanker
 import typing as T
 from Rerank.Utils import HF_PRE_DEFIND_MODELS
-from llama_index.core.postprocessor.types import BaseNodePostprocessor
-from llama_index.core.schema import NodeWithScore, QueryBundle
+from llama_index.core.schema import NodeWithScore
+from Schema.DocumentSchema import Document
 from Common.Logger import logger
 METHOD_MAP = {
     # Existing reranking methods
@@ -29,24 +29,8 @@ METHOD_MAP = {
     "inranker": InRanker
 }
 
-# Create dummy classes for type hints when user's framework is not available
-class Document:
-    def __init__(self, question=None, contexts=None):
-        self.question = question
-        self.contexts = contexts or []
-        self.reorder_contexts = []
 
-class Question:
-    def __init__(self, question):
-        self.question = question
-        
-class Context:
-    def __init__(self, text, id, score=0.0):
-        self.text = text
-        self.id = id
-        self.score = score
-
-class Reranker(BaseNodePostprocessor):
+class Reranker:
     """
     Adapter to integrate user's reranker models with LlamaIndex's postprocessor interface.
     This bridges the gap between user's Document/Context schema and LlamaIndex's NodeWithScore.
@@ -74,14 +58,11 @@ class Reranker(BaseNodePostprocessor):
             raise
 
 
-
-    def _postprocess_nodes(
+    def rerank(
         self,
         nodes: T.List[NodeWithScore],
-        query_bundle: T.Optional[QueryBundle] = None,
+        question: str
     ) -> T.List[NodeWithScore]:
-        if query_bundle is None:
-            raise ValueError("Query bundle is required for reranking.")
         if not nodes:
             return []
         
@@ -90,14 +71,11 @@ class Reranker(BaseNodePostprocessor):
             return nodes[:self._top_n]  # Fallback to original order
 
         try:
-            # Convert to user's format
-            document = self._convert_to_user_format(nodes, query_bundle.query_str)
-            
+           
+            document = Document(question=question, contexts=nodes)
             # Apply user's reranker
             reranked_documents = self._reranker.rank([document])
-            
-            # Convert back to LlamaIndex format
-            return self._convert_from_user_format(reranked_documents[0], nodes)
+            return reranked_documents[0].reorder_contexts
             
         except Exception as e:
             logger.error(f"❌ Reranking failed with {self._reranker_name}: {e}")

@@ -110,7 +110,7 @@ class MonoBERT(BaseRanking):
             List[Document]: Documents with updated **`reorder_contexts`** after reranking.
         """
         for document in tqdm(documents, desc="Reranking Documents"):
-            query = document.question.question
+            query = document.question
             contexts = deepcopy(document.contexts)
 
             # Rescore contexts using MonoBERT

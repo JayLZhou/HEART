@@ -92,7 +92,7 @@ class TWOLAR(BaseRanking):
         """
 
         for document in tqdm(documents, desc="Reranking Documents"):
-            query = document.question.question
+            query = document.question
             contexts = [ctx.text for ctx in document.contexts]
 
             # Encode the inputs

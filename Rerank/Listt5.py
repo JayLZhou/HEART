@@ -146,7 +146,7 @@ class ListT5(BaseRanking):
         Returns:
             List[Context]: The reordered list of contexts.
         """
-        question = document.question.question
+        question = document.question
         contexts = [ctx.text for ctx in document.contexts]
         scores = [ctx.score for ctx in document.contexts]
         full_list_idx = list(range(len(contexts)))

@@ -138,11 +138,9 @@ class UPR(BaseRanking):
         """
         all_ids=[]
         for context in document.contexts:
-            text,title = context.text,context.title
-            if title is not None:
-                ids="{} {} {}. {}".format(verbalizer_head, title, text,verbalizer)
-            else:
-                ids="{} {}. {}".format(verbalizer_head, text,verbalizer)
+            text = context.text
+           
+            ids="{} {}. {}".format(verbalizer_head, text,verbalizer)
 
             all_ids.append(ids)
             # has_answer_list.append(has_answer)
@@ -224,11 +222,9 @@ class UPR(BaseRanking):
         has_answer_list = []
         max_input_size = -1
         for context in document.contexts:
-            text,title,has_answer = context.text,context.title,context.has_answer
-            if title is not None:
-                passage ="{} {} {}. {}".format(verbalizer_head, title, text,verbalizer)
-            else:
-                passage ="{} {}. {}".format(verbalizer_head, text,verbalizer)
+            text = context.text
+           
+            passage ="{} {}. {}".format(verbalizer_head, text,verbalizer)
 
             cids = tokenizer(passage,
                              max_length=512,
@@ -236,7 +232,7 @@ class UPR(BaseRanking):
             
             clabel = [-100]*len(cids)
 
-            question = document.question.question
+            question = document.question
 
             qids= tokenizer(question,
                             max_length=128,
@@ -258,7 +254,6 @@ class UPR(BaseRanking):
             if len(ids)> max_input_size:
                 max_input_size = len(ids)
             
-            has_answer_list.append(has_answer)
         
         padded_labels, padded_ids = [], []
         for ids, label in zip(all_ids, all_labels):

@@ -279,7 +279,7 @@ class FlashRanker(BaseRanking):
         for document in tqdm(documents, desc="Reranking Documents"):
             if len(document.contexts) == 0:
                 continue
-            query = document.question.question
+            query = document.question
             passages = document.contexts
             if self.llm_model is not None:
                 document.reorder_contexts=self._listwisellm(query,passages)

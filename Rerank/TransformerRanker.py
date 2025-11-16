@@ -71,16 +71,22 @@ class TransformerRanker(BaseRanking):
         """
         device = kwargs.get("device", "cuda")
         self.device = get_device(device)
-        self.dtype = get_dtype( kwargs.get("dtype", torch.float32), self.device)
+        self.dtype = get_dtype(kwargs.get("dtype", torch.float32), self.device)
+        
+        # 获取完整模型ID（如果是简称则转换）
+        full_model_name = HF_PRE_DEFIND_MODELS.get('transformer_ranker', {}).get(model_name, model_name)
+        # 获取本地模型路径
+        model_path = get_model_path(full_model_name)
+        
         self.model = AutoModelForSequenceClassification.from_pretrained(
-            model_name,
+            model_path,
             num_labels=1, 
             trust_remote_code=True,
             torch_dtype=self.dtype
-            ).to(self.device)
+        ).to(self.device)
         self.model.eval()
 
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        self.tokenizer = AutoTokenizer.from_pretrained(model_path)
         self.batch_size = kwargs.get("batch_size", 16)
 
     def tokenize(self, inputs: Union[str,List[str], List[Tuple[str, str]]]):
@@ -110,7 +116,7 @@ class TransformerRanker(BaseRanking):
         for document in tqdm(documents, desc="Reranking Documents"):
             context_copy= copy.deepcopy(document.contexts)
 
-            inputs = [(document.question.question, context.text) for context in document.contexts]
+            inputs = [(document.question, context.text) for context in document.contexts]
 
             batched_inputs = [
                 inputs[i:i+self.batch_size] for i in range(0,len(inputs),self.batch_size)

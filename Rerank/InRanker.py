@@ -138,7 +138,7 @@ class InRanker(BaseRanking):
             context_copy= copy.deepcopy(document.contexts)
             for batch in self._chunks(document.contexts,self.batch_size):
                 queries_documents = [ 
-                    f"Query: {document.question.question} Document: {context.text} Relevant:" for context in batch
+                    f"Query: {document.question} Document: {context.text} Relevant:" for context in batch
                 ]
                 tokenized = self.tokenizer(queries_documents,
                                            padding=True,

@@ -11,9 +11,6 @@ class BasicBOTuner(BasicTuner):
     def _create_tuner(self):
         pass
 
-    @abstractmethod
-    def _evaluate(self):
-        pass
 
     @abstractmethod
     def get_sampler(self):

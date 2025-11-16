@@ -127,7 +127,7 @@ class RankT5(BaseRanking):
             List[Document]: The documents with updated `reorder_contexts`.
         """
         for document in tqdm(documents, desc="Reranking Documents"):
-            query = document.question.question
+            query = document.question
             passages = copy.deepcopy(document.contexts)
 
             # Prepare input texts based on the selected mode
