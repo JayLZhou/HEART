@@ -5,12 +5,11 @@ from typing import Dict, List, Optional, Tuple, cast
 from llama_index.core.async_utils import run_async_tasks
 from llama_index.core.callbacks.base import CallbackManager
 from llama_index.core.constants import DEFAULT_SIMILARITY_TOP_K
-from llama_index.core.llms.utils import LLMType, resolve_llm
+from Config.LLMConfig import LLMType
 from llama_index.core.prompts import PromptTemplate
 from llama_index.core.prompts.mixin import PromptDictType
 from llama_index.core.retrievers import BaseRetriever
 from llama_index.core.schema import IndexNode, NodeWithScore, QueryBundle
-from llama_index.core.settings import Settings
 
 QUERY_GEN_PROMPT = (
     "You are a helpful assistant that generates multiple search queries based on a "
@@ -59,9 +58,7 @@ class QueryFusionRetriever(BaseRetriever):
             # Sum of retriever_weights must be 1
             total_weight = sum(retriever_weights)
             self._retriever_weights = [w / total_weight for w in retriever_weights]
-        self._llm = (
-            resolve_llm(llm, callback_manager=callback_manager) if llm else Settings.llm
-        )
+        self._llm = llm
         super().__init__(
             callback_manager=callback_manager,
             object_map=object_map,
@@ -85,6 +82,8 @@ class QueryFusionRetriever(BaseRetriever):
             num_queries=self.num_queries - 1,
             query=original_query,
         )
+        import pdb
+        pdb.set_trace()
         response = self._llm.complete(prompt_str)
 
         # Strip code block and assume LLM properly put each query on a newline

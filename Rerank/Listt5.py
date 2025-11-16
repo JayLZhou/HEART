@@ -106,7 +106,7 @@ class ListT5(BaseRanking):
         Returns:
             Tuple[FiDT5, T5Tokenizer]: The **model** and its **tokenizer**.
         """
-
+        
         tokenizer = T5Tokenizer.from_pretrained(self.model_name)
         model = FiDT5.from_pretrained(self.model_name)
         if self.use_gpu:

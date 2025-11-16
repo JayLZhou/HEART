@@ -1,5 +1,18 @@
 from typing import Union, List, Optional, Tuple
 import torch
+MODEL_NAME_DEFAULTS = {
+    'flashrank': 'ms-marco-MiniLM-L-12-v2',
+    'transformer_ranker': 'mxbai-rerank-xsmall', 
+    'colbert_ranker': 'Colbert',
+    'monot5': 'monot5-base-msmarco',
+    'rankt5': 'rankt5-base',
+    'listt5': 'listt5-base', 
+    'twolar': 'twolar-xl',
+    'monobert_ranker': 'monobert-large',
+    'inranker': 'inranker-base',  
+    'echorank': 'flan-t5-large',
+    'upr': 't5-base'
+}
 # https://github.com/DataScienceUIBK/Rankify/blob/main/rankify/utils/pre_defind_models.py
 HF_PRE_DEFIND_MODELS ={
     'upr':{

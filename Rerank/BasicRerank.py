@@ -1,14 +1,13 @@
 
 from abc import abstractmethod
 from Schema.DocumentSchema import Document
-from llama_index.core.postprocessor.types import BaseNodePostprocessor
 import typing as T
 from llama_index.core.schema import NodeWithScore, QueryBundle
 from Common.Logger import logger
 import time
 from typing import List
 
-class BaseRanking(BaseNodePostprocessor):
+class BaseRanking():
     """
     An abstract base class for implementing different ranking models.
 

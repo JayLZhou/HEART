@@ -6,8 +6,7 @@ from Common.ContextMixin import ContextMixin
 from Option.Config2 import Config
 from pydantic import BaseModel
 from Prompt import get_template
-from llama_index.core.retrievers import QueryFusionRetriever
-from llama_index.core.retrievers.fusion_retriever import FUSION_MODES
+from Index.FusionRetriever import QueryFusionRetriever, FUSION_MODES
 from Rerank import get_reranker
 class FlowBuilder(ContextMixin, BaseModel):
     """Builds different types of flows based on configuration."""
@@ -43,7 +42,7 @@ class FlowBuilder(ContextMixin, BaseModel):
         import pdb
         retrievers = self.get_retriever(params["rag_retriever"])
         # get reranker
-        pdb.set_trace()
+        
         reranker = get_reranker(params["reranker"])
     
         self._flow =  RAGFlow(**common_args)
