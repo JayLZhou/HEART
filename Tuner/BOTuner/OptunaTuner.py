@@ -1,5 +1,6 @@
 import optuna
 import typing as T
+import hashlib
 import json
 import traceback
 from datetime import datetime, timezone
@@ -9,17 +10,24 @@ from Tuner.BOTuner.HierarchicalTPE import HierarchicalTPESampler
 from Tuner.BOTuner.BasicBOTuner import BasicBOTuner
 from Pipeline.FlowBuild import FlowBuilder
 from Utils.Evaluation import Evaluator
+from Storage.NameSpace import Workspace, Namespace
+from Storage.OptunaStorage import OptunaStorage
 
 
      
 
 
 class OptunaTuner(BasicBOTuner):
-    def __init__(self, config: Config, builder: FlowBuilder, evaluator: Evaluator):
+    def __init__(self, config: Config, builder: FlowBuilder, evaluator: Evaluator, query: dict):
         self.config = config
         self.builder = builder
         self.evaluator = evaluator
-        self._tuner = self._create_tuner()
+        self.workspace = Workspace(self.config.working_dir, self.config.exp_name)
+        self.namespace = Namespace(self.workspace)
+        print("Namespace: ", self.namespace)
+        self.storage = OptunaStorage(self.namespace)
+        # self._tuner = self._create_tuner()
+        self._tuner = self._create_tuner(query)
 
     def get_sampler(self) -> optuna.samplers.BaseSampler:
         if self.config.tuner.optimization.sampler == "tpe":
@@ -40,9 +48,10 @@ class OptunaTuner(BasicBOTuner):
        
 
 
-    def _create_tuner(self) -> optuna.Study:
+    def _create_tuner(self, query: dict) -> optuna.Study:
         """Get a study instance for optuna"""
-        study_name = self.config.tuner.name
+        # study_name = self.config.tuner.name
+        study_name = hashlib.sha256(json.dumps(query, sort_keys=True).encode()).hexdigest()
 
         
         if self.config.tuner.reuse_study:
@@ -50,14 +59,17 @@ class OptunaTuner(BasicBOTuner):
                 "Reusing study '%s' or creating new one", study_name
             )
             if self.config.tuner.recreate_study:
-                self.recreate_with_completed_trials(self.config, storage)
+                self.recreate_with_completed_trials(self.config, self.storage.get_storage())
      
 
         sampler = self.get_sampler()
+        print("111 Namespace: ", self.namespace)
+        print("111 storage: ", self.storage.namespace)
         study = optuna.create_study(
             study_name=study_name,
             directions=["maximize"],
             sampler=sampler,
+            storage=self.storage.get_storage()
         )
         # self.save_config(study, self.study_config)
         return study
@@ -103,6 +115,7 @@ class OptunaTuner(BasicBOTuner):
                 trial=trial,
                 metrics=metrics,
                 flow_json=json.dumps(params),
+                query=query
             )
         self._tuner.tell(trial, [metrics[self.config.tuner.optimization.objective_1_name]])
         import pdb
@@ -110,12 +123,14 @@ class OptunaTuner(BasicBOTuner):
         return metrics
 
 
-    def _set_trial(self, trial: optuna.trial.FrozenTrial | optuna.trial.Trial, metrics: T.Dict[str, float] | None = None, flow_json: str | None = None):
+    def _set_trial(self, trial: optuna.trial.FrozenTrial | optuna.trial.Trial, metrics: T.Dict[str, float] | None = None, flow_json: str | None = None, query: dict | None = None):
         if metrics:
             for metric_name, score in metrics.items():
                 trial.set_user_attr("metric_" + metric_name, score)   
         if flow_json:
                 trial.set_user_attr("flow", flow_json)
+        if query:
+                trial.set_user_attr("query", query)
        
     def _trial_exists(self,
     study_name: str,
