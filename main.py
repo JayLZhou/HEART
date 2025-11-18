@@ -80,7 +80,7 @@ if __name__ == "__main__":
     builder.build_indexing(corpus)
     evaluator = Evaluator(eval_path=os.path.join(opt.working_dir, opt.exp_name, "Results", "results.json"), dataset_name=opt.dataset_name)
 
-    tuner = get_tuner(config=opt, builder=builder, evaluator=evaluator)
+    tuner = get_tuner(config=opt, builder=builder, evaluator=evaluator, query=dataset[0])
     # Online RAG tuning
     wrapper_tuning(tuner)
 
