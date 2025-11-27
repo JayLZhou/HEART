@@ -61,11 +61,12 @@ def wrapper_tuning(tuner):
         results = []
         query = dataset[idx]
         for i in tqdm(range(num_trials), desc="Running trials"):
-            logger.info("Running trial %d/%d", i+1, num_trials)
+            logger.info(f"Running trial {i+1}/{num_trials}")
             try:
                 result = tuner(query = query)
             except Exception as e:
-                logger.error(f"Trial %d failed with error: {str(e)}", i+1)
+                logger.error(f"Trial {i+1} failed with error: {str(e)}")
+                raise
                 continue
         results.append(result)        
 

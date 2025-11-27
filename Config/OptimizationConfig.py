@@ -138,7 +138,7 @@ class OptimizationConfig(BaseModel):
     obj2_zscore: float = Field(
         default=1.645, description="Z-score for the second objective."
     )
-    sampler: T.Literal["tpe", "hierarchical"] = Field(
+    sampler: T.Literal["tpe", "hierarchical", "llmbo"] = Field(
         default="tpe",
         description='Type of sampler to use (e.g., "tpe", "hierarchical").',
     )
