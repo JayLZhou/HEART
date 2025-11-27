@@ -14,6 +14,7 @@ from llama_index.core.schema import QueryBundle
 import numpy as np
 from llama_index.vector_stores.faiss import FaissVectorStore
 from concurrent.futures import ProcessPoolExecutor
+from Index.EmbeddingFactory import get_rag_embedding
 from tqdm import tqdm
 
 class FaissIndex(BaseIndex):
@@ -24,18 +25,21 @@ class FaissIndex(BaseIndex):
 
     def __init__(self, config):
         super().__init__(config)
-        self.embedding_model =config.embed_model
+        print(config)
+        self.embedding_model = get_rag_embedding(self.config.embedding.api_type, self.config)
     def retrieval(self, query, top_k):
         if top_k is None:
             top_k = self._get_retrieve_top_k()
-        retriever = self._index.as_retriever(similarity_top_k=top_k, embed_model=self.config.embed_model)
+        retriever = self._index.as_retriever(similarity_top_k=top_k, embed_model=self.embedding_model)
         query_emb = self._embed_text(query)
         query_bundle = QueryBundle(query_str=query, embedding=query_emb)
     
-        return retriever.aretrieve(query_bundle)
+        # TODO: async
+        # return retriever.aretrieve(query_bundle)
+        return retriever.retrieve(query_bundle)
 
     def get_retriever(self, top_k):
-        return self._index.as_retriever(similarity_top_k=top_k, embed_model=self.config.embed_model)
+        return self._index.as_retriever(similarity_top_k=top_k, embed_model=self.embedding_model)
 
     def retrieval_batch(self, queries, top_k):
         pass
@@ -52,7 +56,7 @@ class FaissIndex(BaseIndex):
                 excluded_embed_metadata_keys=meta_data,
             )
             return document
-        Settings.embed_model = self.config.embed_model
+        Settings.embed_model = self.embedding_model
         documents = [process_document(data) for data in datas]
         texts = [doc.text for doc in documents] 
       
@@ -63,11 +67,11 @@ class FaissIndex(BaseIndex):
         text_embeddings = self.embedding_model._get_text_embeddings(texts)
 
         # 32 is the default value of hnsw index
-        vector_store = FaissVectorStore(faiss_index=faiss.IndexHNSWFlat(self.config.dimensions, 32))
+        vector_store = FaissVectorStore(faiss_index=faiss.IndexHNSWFlat(self.config.embedding.dimensions, 32))
         storage_context = StorageContext.from_defaults(vector_store=vector_store)
 
         self._index =  VectorStoreIndex([], storage_context=storage_context,
-            embed_model= self.config.embed_model)
+            embed_model= self.embedding_model)
       
       
         
@@ -84,13 +88,13 @@ class FaissIndex(BaseIndex):
 
     def _load_index(self) -> bool:
         try:
-            Settings.embed_model = self.config.embed_model
+            Settings.embed_model = self.embedding_model
 
             vector_store = FaissVectorStore.from_persist_dir(str(self.config.persist_path))
   
             storage_context = StorageContext.from_defaults(vector_store=vector_store, persist_dir=self.config.persist_path)
      
-            self._index  =load_index_from_storage(storage_context=storage_context, embed_model=self.config.embed_model)
+            self._index  =load_index_from_storage(storage_context=storage_context, embed_model=self.embedding_model)
 
             return True
         except Exception as e:
@@ -116,7 +120,7 @@ class FaissIndex(BaseIndex):
         logger.info("refresh index size is {}".format(len([True for doc in refreshed_docs if doc])))
 
     def _get_index(self):
-        Settings.embed_model = self.config.embed_model
+        Settings.embed_model = self.embedding_model
         #TODO: config the faiss index config
         vector_store = FaissVectorStore(faiss_index=faiss.IndexHNSWFlat(1024, 32))
         storage_context = StorageContext.from_defaults(vector_store=vector_store)
@@ -124,7 +128,7 @@ class FaissIndex(BaseIndex):
         return  VectorStoreIndex(
             nodes = [],
             storage_context=storage_context,
-            embed_model= self.config.embed_model,
+            embed_model= self.embedding_model,
         )   
    
 

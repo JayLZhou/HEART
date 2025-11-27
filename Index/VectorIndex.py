@@ -39,8 +39,8 @@ class VectorIndex(BaseIndex):
     def _update_index(self, datas: list[dict[str:Any]], meta_data: list):
         def process_document(data):
             document = Document(
-                doc_id=mdhash_id(data["content"]),
-                text=data["content"],
+                doc_id=mdhash_id(data[0]),
+                text=data[1].content,
                 metadata={key: data[key] for key in meta_data},
                 excluded_embed_metadata_keys=meta_data,
             )
