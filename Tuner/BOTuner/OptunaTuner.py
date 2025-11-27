@@ -4,10 +4,13 @@ import hashlib
 import json
 import traceback
 from datetime import datetime, timezone
+from optuna.exceptions import DuplicatedStudyError
+from optuna.study import Study
 from Option.Config2 import Config
 from Common.Logger import logger
 from Tuner.BOTuner.HierarchicalTPE import HierarchicalTPESampler
 from Tuner.BOTuner.BasicBOTuner import BasicBOTuner
+from Tuner.BOTuner.LLMBO import LLMBOSampler
 from Pipeline.FlowBuild import FlowBuilder
 from Utils.Evaluation import Evaluator
 from Storage.NameSpace import Workspace, Namespace
@@ -41,6 +44,10 @@ class OptunaTuner(BasicBOTuner):
                 constant_liar=True,
                 n_startup_trials=self.config.optimization.num_random_trials,
             )
+        elif self.config.tuner.optimization.sampler == "llmbo":
+            return LLMBOSampler(
+                config=self.config,
+            )
         else:
             raise ValueError("Invalid sampler")
 
@@ -48,36 +55,43 @@ class OptunaTuner(BasicBOTuner):
        
 
 
-    def _create_tuner(self, query: dict) -> optuna.Study:
+    def _create_tuner(self, query: dict) -> Study:
         """Get a study instance for optuna"""
         # study_name = self.config.tuner.name
         study_name = hashlib.sha256(json.dumps(query, sort_keys=True).encode()).hexdigest()
 
         
-        if self.config.tuner.reuse_study:
-            logger.info(
-                "Reusing study '%s' or creating new one", study_name
-            )
-            if self.config.tuner.recreate_study:
-                self.recreate_with_completed_trials(self.config, self.storage.get_storage())
+        # if self.config.tuner.reuse_study:
+        #     logger.info(
+        #         "Reusing study '%s' or creating new one", study_name
+        #     )
+        #     if self.config.tuner.recreate_study:
+        #         self.recreate_with_completed_trials(self.config, self.storage.get_storage())
      
 
-        sampler = self.get_sampler()
-        print("111 Namespace: ", self.namespace)
-        print("111 storage: ", self.storage.namespace)
-        study = optuna.create_study(
-            study_name=study_name,
-            directions=["maximize"],
-            sampler=sampler,
-            storage=self.storage.get_storage()
-        )
+        try:
+            sampler = self.get_sampler()
+            study = optuna.create_study(
+                study_name=study_name,
+                directions=["maximize"],
+                sampler=sampler,
+                storage=self.storage.get_storage(),
+            )
+            study.set_user_attr("query", query)
+        except DuplicatedStudyError:
+            study = optuna.load_study(
+                study_name=study_name,
+                storage=self.storage.get_storage(),
+            )
+
+
         # self.save_config(study, self.study_config)
         return study
 
 
 
 
-    def save_config(self, study: optuna.Study, config: Config):
+    def save_config(self, study: Study, config: Config):
         """Save study config to database"""
         attrs = config.model_dump(mode="json")
         logger.info("Saving study config of %s to the database", study.study_name)

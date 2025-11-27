@@ -34,6 +34,7 @@ class OptunaStorage:
         Returns:
             Optuna Study object, or None if file doesn't exist
         """
+
         storage = self.get_storage(file_path)
         
         # Load complete study object using joblib

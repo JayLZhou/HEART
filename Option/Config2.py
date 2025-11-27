@@ -112,14 +112,15 @@ class Config(WorkingParams, YamlModel):
         if self.llm.api_type == LLMType.OPENAI:
             return self.llm
         return None
-def parse(opt_path):
     
-        with open(opt_path, mode='r') as f:
-            opt = YamlModel.read_yaml(opt_path)
-        # export CUDA_VISIBLE_DEVICES
-        # gpu_list = ','.join(str(x) for x in opt['gpu_ids'])
-        # os.environ['CUDA_VISIBLE_DEVICES'] = gpu_list
-        return opt
+def parse(opt_path):    
+    with open(opt_path, mode='r') as f:
+        opt = YamlModel.read_yaml(opt_path)
+    # export CUDA_VISIBLE_DEVICES
+    # gpu_list = ','.join(str(x) for x in opt['gpu_ids'])
+    # os.environ['CUDA_VISIBLE_DEVICES'] = gpu_list
+    return opt
+
 def merge_dict(dicts: Iterable[Dict]) -> Dict:
     """Merge multiple dicts into one, with the latter dict overwriting the former"""
     result = {}
