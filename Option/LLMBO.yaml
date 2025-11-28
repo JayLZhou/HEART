@@ -1,0 +1,96 @@
+
+
+
+embedding:
+  api_type: "modelscope"  # or  ollama / etc.
+  base_url: "http://localhost:8007/v1"  # or forward url / other llm url
+  api_key: "sk-LGORY9rX516364f6fd78T3BLbKFJ0cD7f508E7aF41C0a769"
+  # api_key: "sk-STmQ0VyP26d5093497aET3BLbkFJAB535192D50E4dB8AeC8"
+  model: "Qwen3-Embedding-0.6B"
+  cache_folder: ""
+  dimensions: 1024
+  max_token_size: 8102
+  embed_batch_size: 128
+  target_devices: ["cuda:4"]
+  backend: "openai"
+  embedding_func_max_async: 16
+ 
+
+################################# Working settings  #################################
+# Basic Config
+llm_model_max_token_size: 32768
+
+index_name: tree_graph_balanced
+force_rebuild: False
+vdb_type: faiss  # vector/colbert
+sparse_index_type: bm25
+tuner_type: bo
+num_trials: 1
+# Chunk Config 
+chunk:
+  chunk_token_size: 1200
+  chunk_overlap_token_size: 100
+  token_model: gpt-3.5-turbo
+  chunk_method: chunking_by_token_size
+
+
+
+# Retrieval Config 
+retriever:
+  # TopK configuration for retrieval
+  top_k:
+    kmin: 2                    # Minimum number of items to retrieve
+    kmax: 128                  # Maximum number of items to retrieve
+    log: False                 # Whether to use logarithmic scale (True) or linear (False)
+    step: 1                    # Step size for top_k values
+  
+  # Retrieval methods: dense (embedding-based), sparse (BM25), or hybrid
+  methods:
+    - dense
+    - sparse
+    - hybrid
+  
+
+  
+  # Hybrid retrieval configuration (BM25 + Dense)
+  hybrid:
+    bm25_weight_min: 0.1       # Minimum weight for BM25 in hybrid retrieval
+    bm25_weight_max: 0.9       # Maximum weight for BM25 in hybrid retrieval
+    bm25_weight_step: 0.1      # Step size for BM25 weight
+  
+  # Query decomposition settings
+  query_decomposition_enabled:
+    - True
+
+  
+  query_decomposition:
+    llm_names:
+      - gpt-4o-mini
+      - anthropic-haiku-35
+      - gemini-flash
+    num_queries_min: 2         # Minimum number of sub-queries to generate
+    num_queries_max: 20        # Maximum number of sub-queries to generate
+    num_queries_step: 2         # Step size for number of sub-queries
+  
+  # Fusion mode for combining results
+  fusion:
+    fusion_modes:
+      - simple
+      - reciprocal_rerank
+      - relative_score
+      - dist_based_score
+    
+ 
+tuner:
+  name: llmbo
+  optimization:
+    sampler: llmbo
+  reuse_study: False
+  recreate_study: False
+
+
+data_root: /mnt/data/wangshu/hcarag/ids_data # Root directory for data
+
+working_dir: /mnt/data/yingli/RAGTuner/ # Result directory for the experiment
+exp_name: llmbo # Experiment name
+# 

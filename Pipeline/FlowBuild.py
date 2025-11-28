@@ -34,12 +34,15 @@ class FlowBuilder(ContextMixin, BaseModel):
         Only focus on online flow building.
         """
         # get response synthesizer llm
+        import pdb
+        pdb.set_trace()
         response_synthesizer_llm = self.get_llm(params["response_synthesizer_llm"])
         # get template
         template = get_template(params["template_name"])
         # get retriever
         retriever = self.get_retriever(params["rag_retriever"])
         # get reranker
+                 
         reranker = get_reranker(params["reranker"])
         # build rag flow
         return RAGFlow(

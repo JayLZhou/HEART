@@ -26,7 +26,8 @@ class FaissIndex(BaseIndex):
     def __init__(self, config):
         super().__init__(config)
         print(config)
-        self.embedding_model = get_rag_embedding(self.config.embedding.api_type, self.config)
+        # self.embedding_model = get_rag_embedding(self.config.embedding.api_type, self.config)
+        self.embedding_model = self.config.embed_model
     def retrieval(self, query, top_k):
         if top_k is None:
             top_k = self._get_retrieve_top_k()
@@ -67,7 +68,9 @@ class FaissIndex(BaseIndex):
         text_embeddings = self.embedding_model._get_text_embeddings(texts)
 
         # 32 is the default value of hnsw index
-        vector_store = FaissVectorStore(faiss_index=faiss.IndexHNSWFlat(self.config.embedding.dimensions, 32))
+        import pdb
+        pdb.set_trace()
+        vector_store = FaissVectorStore(faiss_index=faiss.IndexHNSWFlat(self.config.dimensions, 32))
         storage_context = StorageContext.from_defaults(vector_store=vector_store)
 
         self._index =  VectorStoreIndex([], storage_context=storage_context,

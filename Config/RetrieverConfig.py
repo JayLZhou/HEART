@@ -153,10 +153,7 @@ class Retriever(BaseModel, SearchSpaceMixin):
             ),
             **self.top_k.build_distributions(prefix=prefix),
         }
-        if "dense" in self.methods:
-            distributions[f"{prefix}embedding_model"] = CategoricalDistribution(
-                self.embedding_models
-            )
+
         if "hybrid" in self.methods:
             distributions.update(**self.hybrid.build_distributions(prefix=prefix))
 

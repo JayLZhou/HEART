@@ -841,15 +841,31 @@ class LLMBOSampler:
         self.workspace = Workspace(self.config.working_dir, self.config.exp_name)
         self.namespace = Namespace(self.workspace)
         self.opt_storage = OptunaStorage(self.namespace)
-        self.query_storage = QueryStorage(config)
+        self.query_storage = QueryStorage(config, self.namespace)
 
     def infer_relative_search_space(self, study: Study, trial: FrozenTrial):
-        return self.config.tuner.search_space.build_distributions()
+        search_space = self.config.tuner.search_space.build_distributions(self.config.tuner.tuner_params)
 
-    def sample_relative(self, study: Study, trial, search_space):
+        def flatten_distributions(d: dict) -> dict:
+            """Recursively extract all leaf BaseDistribution objects into a flat dict."""
+            flat = {}
+            for k, v in d.items():
+                if isinstance(v, dict):
+                    flat.update(flatten_distributions(v))
+                else:
+                    flat[k] = v
+            return flat
+
+        search_space = flatten_distributions(search_space)
+        return search_space
+
+    def sample_relative(self, study: Study, trial, search_space: dict):
         print(study, trial)
         if self._is_first_query():
-            return self.search_space.sample(trial=trial, parameters=list(search_space.keys()))
+            random_sample = self.search_space.sample_from_distributions(dists=search_space)
+            import pdb
+            pdb.set_trace()
+            return random_sample
         if self._is_first_trial(study):
             warm_start_point = self._warm_start(study)
             self.query_storage.upsert(study.user_attrs.get("query"))
@@ -881,13 +897,19 @@ class LLMBOSampler:
 
         return best_point.iloc[0].to_dict()
 
+    def before_trial(self, study: Study, trial: FrozenTrial):
+        pass
 
     def _is_first_query(self):
-        is_first_query = (self.storage.size() == 0)
+        is_first_query = (self.query_storage.size() == 0)
+        import pdb
+        pdb.set_trace()
         return is_first_query
 
     def _is_first_trial(self, study):
         is_first_trial = (len(study.get_trials(deepcopy=False)) == 0)
+        import pdb
+        pdb.set_trace()
         return is_first_trial
 
     def _warm_start(self, study, trial):
@@ -918,6 +940,7 @@ class LLMBOSampler:
 
         # configs → DataFrame
         observed_configs = pd.DataFrame([t.params for t in completed])
+
 
         # fvals → Series（支持单目标和多目标）
         if len(completed) > 0 and completed[0].values is not None:

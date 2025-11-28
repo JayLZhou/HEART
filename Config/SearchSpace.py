@@ -5,6 +5,14 @@ from Config.RetrieverConfig import Retriever
 from Config.TopKConfig import TopK
 from Config.RerankConfig import Reranker
 from Config.SearchSpaceMix import *
+import numpy as np
+import random
+from optuna.distributions import (
+    FloatDistribution,
+    IntDistribution,
+    CategoricalDistribution,
+    BaseDistribution,
+)
 
 
 class SearchSpace(BaseModel):
@@ -43,7 +51,6 @@ class SearchSpace(BaseModel):
         return {
             "template_name": self.template_names[0],
             "response_synthesizer_llm": self.response_synthesizer_llms[0],
-            "reranker_enabled": False,
             **self.rag_retriever.defaults(),
         }
 
@@ -64,12 +71,13 @@ class SearchSpace(BaseModel):
             "response_synthesizer_llm": CategoricalDistribution(
                 self.response_synthesizer_llms
             ),
-            "reranker_enabled": CategoricalDistribution(self.reranker_enabled),
+          
         }
 
         distributions.update(self.rag_retriever.build_distributions())
-        if True in self.reranker_enabled:
-            distributions.update(self.reranker.build_distributions())
+        if "reranker" in params:
+            distributions['reranker'] = self.reranker.build_distributions()
+      
 
 
         if params is not None:
@@ -77,7 +85,7 @@ class SearchSpace(BaseModel):
                 key: val for key, val in distributions.items() if key in params
             }
             return reduced_distributions
-
+   
         return distributions
 
     def sample(self, trial: Trial, parameters: T.List[str]) -> ParamDict:
@@ -92,6 +100,7 @@ class SearchSpace(BaseModel):
             params["template_name"] = self._default_params["template_name"]
 
         if "response_synthesizer_llm" in parameters:
+
             params["response_synthesizer_llm"] = trial.suggest_categorical(
                 "response_synthesizer_llm", self.response_synthesizer_llms
             )
@@ -108,6 +117,49 @@ class SearchSpace(BaseModel):
 
 
         return params
+    
+
+    def sample_from_distributions(
+        self, dists: T.Dict[str, BaseDistribution]
+    ) -> T.Dict[str, T.Any]:
+        """
+        Randomly sample values given a dict: {param_name: BaseDistribution}.
+        Supports Float, Int, Categorical.
+        """
+
+        sample = {}
+
+        for name, dist in dists.items():
+            if isinstance(dist, FloatDistribution):
+                if dist.log:
+                    # sample log-uniform
+                    v = np.exp(
+                        random.uniform(np.log(dist.low), np.log(dist.high))
+                    )
+                else:
+                    v = random.uniform(dist.low, dist.high)
+                sample[name] = v
+
+            elif isinstance(dist, IntDistribution):
+                if dist.log:
+                    # log-uniform integer
+                    v = int(
+                        np.exp(
+                            random.uniform(np.log(dist.low), np.log(dist.high))
+                        )
+                    )
+                else:
+                    # integers are inclusive
+                    v = random.randint(dist.low, dist.high)
+                sample[name] = v
+
+            elif isinstance(dist, CategoricalDistribution):
+                sample[name] = random.choice(dist.choices)
+
+            else:
+                raise NotImplementedError(f"Unsupported distribution type: {dist}")
+
+        return sample
 
     def get_cardinality(self) -> int:
         card = 0
@@ -115,12 +167,9 @@ class SearchSpace(BaseModel):
         sub_card = (
             len(self.template_names)
             * len(self.response_synthesizer_llms)
-            * len(self.reranker_enabled)
         )
     
         sub_card *= self.rag_retriever.get_cardinality()
-        if True in self.reranker_enabled:
-            sub_card *= self.reranker.get_cardinality()
 
         card += sub_card
 

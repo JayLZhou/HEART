@@ -1,9 +1,11 @@
 from dataclasses import dataclass, field
 from typing import Dict, Optional, List
 from Common.Logger import logger
-from Index.FaissIndex import FaissIndex  # 你已有的 FaissIndex
+from Index.FaissIndex import FaissIndex
+from Index import get_index, get_index_config
 from Option.Config2 import Config
 from Storage.BaseStorage import BaseStorage
+from Storage.NameSpace import Namespace
 import numpy as np
 
 class QueryContent:
@@ -15,12 +17,13 @@ class QueryStorage(BaseStorage):
     """Simple text → embedding → FAISS storage with id support."""
 
     index: FaissIndex = None
-    _key_to_text: Dict[str, str] = field(default_factory=dict)       # key → text
-    _key_to_metadata: Dict[str, dict] = field(default_factory=dict)  # key → metadata
+    _key_to_text: Dict[str, str] = {}     # key → text
+    _key_to_metadata: Dict[str, dict] = {}  # key → metadata
 
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, namespace: Namespace):
         self.config = config
-        self.index = FaissIndex(config)
+        self.namespace = namespace
+        self.index = get_index(get_index_config(config, self.namespace.workspace.make_for("query_vdb").get_save_path()))
 
     def size(self):
         return len(self._key_to_text)

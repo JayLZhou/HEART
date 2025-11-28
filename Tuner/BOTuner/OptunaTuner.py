@@ -30,6 +30,7 @@ class OptunaTuner(BasicBOTuner):
         print("Namespace: ", self.namespace)
         self.storage = OptunaStorage(self.namespace)
         # self._tuner = self._create_tuner()
+        
         self._tuner = self._create_tuner(query)
 
     def get_sampler(self) -> optuna.samplers.BaseSampler:
@@ -60,7 +61,7 @@ class OptunaTuner(BasicBOTuner):
         # study_name = self.config.tuner.name
         study_name = hashlib.sha256(json.dumps(query, sort_keys=True).encode()).hexdigest()
 
-        
+
         # if self.config.tuner.reuse_study:
         #     logger.info(
         #         "Reusing study '%s' or creating new one", study_name
@@ -70,20 +71,21 @@ class OptunaTuner(BasicBOTuner):
      
 
         try:
-            sampler = self.get_sampler()
-            study = optuna.create_study(
-                study_name=study_name,
-                directions=["maximize"],
-                sampler=sampler,
-                storage=self.storage.get_storage(),
-            )
-            study.set_user_attr("query", query)
-        except DuplicatedStudyError:
-            study = optuna.load_study(
+            optuna.delete_study(
                 study_name=study_name,
                 storage=self.storage.get_storage(),
             )
-
+        except KeyError:
+            pass
+        
+        sampler = self.get_sampler()
+        study = optuna.create_study(
+            study_name=study_name,
+            directions=["maximize"],
+            sampler=sampler,
+            storage=self.storage.get_storage(),
+        )
+        study.set_user_attr("query", query)
 
         # self.save_config(study, self.study_config)
         return study
@@ -105,9 +107,31 @@ class OptunaTuner(BasicBOTuner):
 
     def __call__(self, query):
         trial = self._tuner.ask()
-        search_space = self.config.tuner.search_space
+        params = trial.params
+        if self.config.tuner.optimization.sampler == "llmbo":
+            sampler = self.get_sampler()
+            search_space = sampler.infer_relative_search_space(study=None, trial=None)
+            study_name = hashlib.sha256(json.dumps(query, sort_keys=True).encode()).hexdigest()
+            study = optuna.load_study(
+                study_name=study_name,
+                storage=self.storage.get_storage(),
+            )
+            import pdb
+            pdb.set_trace()
+            params = sampler.sample_relative(study, trial, search_space)
+        else:
+            search_space = self.config.tuner.search_space
+            params = search_space.sample(trial, self.config.tuner.tuner_params)
 
-        params = search_space.sample(trial, self.config.tuner.tuner_params)
+
+        import pdb
+        pdb.set_trace()
+
+        print(f"TRIAL: {params}")
+
+        for k, v in params.items():
+            trial.set_user_attr(f"suggested:{k}", v)
+
         try:   
             flow = self.builder.build_flow(params)
             response = flow.query(query["question"])
