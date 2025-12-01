@@ -9,6 +9,7 @@ import pandas as pd
 from Option.Config2 import Config
 from optuna.study import Study
 from optuna.trial import FrozenTrial, TrialState
+from optuna.distributions import CategoricalDistribution, IntDistribution, FloatDistribution
 from Storage.QueryStorage import QueryStorage
 from Storage.NameSpace import Workspace, Namespace
 from Storage.OptunaStorage import OptunaStorage
@@ -16,6 +17,18 @@ from Storage.OptunaStorage import OptunaStorage
 from Provider.LLMProviderRegister import create_llm_instance
 
 from langchain import FewShotPromptTemplate, PromptTemplate
+
+def _count_decimal_places(n):
+    '''Count the number of decimal places in a number.'''
+    s = format(n, '.10f')
+    if '.' not in s:
+        return 0
+    num_dp = len(s.split('.')[1].rstrip('0')) 
+    if num_dp == 0:
+        return 2
+    else:
+        return num_dp
+
 
 def prepare_configurations(
     hyperparameter_constraints,
@@ -68,6 +81,7 @@ def prepare_configurations(
             example['A'] = label
         examples.append(example)
         
+
     return examples
 
 def gen_prompt_tempates(
@@ -87,11 +101,11 @@ def gen_prompt_tempates(
 
     model = task_context['model']
     task = task_context['task']
-    tot_feats = task_context['tot_feats']
-    cat_feats = task_context['cat_feats']
-    num_feats = task_context['num_feats']
-    n_classes = task_context['n_classes']
-    n_samples = task_context['num_samples']
+    # tot_feats = task_context['tot_feats']
+    # cat_feats = task_context['cat_feats']
+    # num_feats = task_context['num_feats']
+    # n_classes = task_context['n_classes']
+    # n_samples = task_context['num_samples']
     metric = task_context['metric']
 
     if metric == 'neg_mean_squared_error':
@@ -119,12 +133,12 @@ Performance: {A}"""
         prefix = f"The following are hyperparameter configurations for a {model} and the corresponding performance measured in {metric}."
         if use_context == 'full_context':
             if task == 'classification':
-                prefix += f" The model is evaluated on a tabular {task} task and the label contains {n_classes} classes."
+                prefix += f" The model is evaluated on a {task} task."
             elif task == 'regression':
-                prefix += f" The model is evaluated on a tabular {task} task."
+                prefix += f" The model is evaluated on a {task} task."
             else:
                 raise Exception
-            prefix += f" The tabular dataset contains {n_samples} samples and {tot_feats} features ({cat_feats} categorical, {num_feats} numerical). "
+            # prefix += f" The tabular dataset contains {n_samples} samples and {tot_feats} features ({cat_feats} categorical, {num_feats} numerical). "
         prefix += f" Your response should only contain the predicted {metric} in the format ## performance ##."
 
         suffix = """
@@ -147,7 +161,7 @@ Performance: """
     return all_prompt_templates, query_examples
 
 class Aquisition:
-    def __init__(self, task_context, n_candidates, n_templates, lower_is_better, 
+    def __init__(self, config: Config, task_context, n_candidates, n_templates, lower_is_better, 
                  jitter=False, rate_limiter=None, warping_transformer=None, chat_engine=None, 
                  prompt_setting=None, shuffle_features=False):
         '''Initialize the LLM Acquisition function.'''
@@ -166,7 +180,7 @@ class Aquisition:
         self.chat_engine = chat_engine
         self.prompt_setting = prompt_setting
         self.shuffle_features = shuffle_features
-        self.llm = create_llm_instance("openai"), 
+        self.llm = create_llm_instance(config.llms[0])
 
         assert type(self.shuffle_features) == bool, 'shuffle_features must be a boolean'
 
@@ -247,25 +261,27 @@ class Aquisition:
                         lower_bound = self.task_context['hyperparameter_constraints'][hyperparameter_names[i]][2][0]
                     else:
                         lower_bound = self.task_context['hyperparameter_constraints'][hyperparameter_names[i]][2][1]
-                    n_dp = self._count_decimal_places(lower_bound)
+
+                    if hyp_type != 'ordinal':
+                        n_dp = self._count_decimal_places(lower_bound)
                     value = row[i]
                     if self.apply_warping:
                         if hyp_type == 'int' and hyp_transform != 'log':
                             row_string += str(int(value))
                         elif hyp_type == 'float' or hyp_transform == 'log':
                             row_string += f'{value:.{n_dp}f}'
-                        elif hyp_type == 'ordinal':
-                            row_string += f'{value:.{n_dp}f}'
+                        # elif hyp_type == 'ordinal':
+                        #    row_string += f'{value:.{n_dp}f}'
                         else:
-                            row_string += value
+                            row_string += str(value)
 
                     else:
                         if hyp_type == 'int':
                             row_string += str(int(value))
-                        elif hyp_type in ['float', 'ordinal']:
-                            row_string += f'{value:.{n_dp}f}'
+                        elif hyp_type in ['float']: # ['float', 'ordinal']:
+                          row_string += f'{value:.{n_dp}f}'
                         else:
-                            row_string += value
+                            row_string += str(value)
 
                     if i != len(row)-1:
                         row_string += ', '
@@ -306,12 +322,12 @@ class Aquisition:
             task_context = self.task_context
             model = task_context['model']
             task = task_context['task']
-            tot_feats = task_context['tot_feats']
-            cat_feats = task_context['cat_feats']
-            num_feats = task_context['num_feats']
-            n_classes = task_context['n_classes']
+            # tot_feats = task_context['tot_feats']
+            # cat_feats = task_context['cat_feats']
+            # num_feats = task_context['num_feats']
+            # n_classes = task_context['n_classes']
             metric = 'mean squared error' if task_context['metric'] == 'neg_mean_squared_error' else task_context['metric']
-            num_samples = task_context['num_samples']
+            # num_samples = task_context['num_samples']
             hyperparameter_constraints = task_context['hyperparameter_constraints']
             
             example_template = """
@@ -324,14 +340,15 @@ Hyperparameter configuration: {Q}"""
             )
 
             prefix = f"The following are examples of performance of a {model} measured in {metric} and the corresponding model hyperparameter configurations."
-            if use_context == 'full_context':
-                if task == 'classification':
-                    prefix += f" The model is evaluated on a tabular {task} task containing {n_classes} classes."
-                elif task == 'regression':
-                    prefix += f" The model is evaluated on a tabular {task} task."
-                else:
-                    raise Exception
-                prefix += f" The tabular dataset contains {num_samples} samples and {tot_feats} features ({cat_feats} categorical, {num_feats} numerical)."
+            prefix += f" The model is evaluated on a tabular {task} task."
+            # if use_context == 'full_context':
+            #     if task == 'classification':
+            #         prefix += f" The model is evaluated on a tabular {task} task containing {n_classes} classes."
+            #     elif task == 'regression':
+            #         prefix += f" The model is evaluated on a tabular {task} task."
+            #     else:
+            #         raise Exception
+            #     prefix += f" The tabular dataset contains {num_samples} samples and {tot_feats} features ({cat_feats} categorical, {num_feats} numerical)."
             prefix += f" The allowable ranges for the hyperparameters are:\n"
             for i, (hyperparameter, constraint) in enumerate(hyperparameter_constraints.items()):
                 if constraint[0] == 'float':
@@ -421,10 +438,7 @@ Hyperparameter configuration:"""
             try:
                 start_time = time.time()
                 resp = await self.llm.acompletion(
-                    messages=message,
-                    stream=False,
-                    max_tokens=500,
-                    format="text"
+                    messages=message
                 )
 
                 break
@@ -479,8 +493,8 @@ Hyperparameter configuration:"""
     def _filter_candidate_points(self, observed_points, candidate_points, precision=8):
         '''Filter candidate points that already exist in observed points. Also remove duplicates.'''
         # drop points that already exist in observed points
-        rounded_observed = [{key: round(value, precision) for key, value in d.items()} for d in observed_points]
-        rounded_candidate = [{key: round(value, precision) for key, value in d.items()} for d in candidate_points]
+        rounded_observed = [{key: value for key, value in d.items()} for d in observed_points]
+        rounded_candidate = [{key: value for key, value in d.items()} for d in candidate_points]
         filtered_candidates = [x for i, x in enumerate(candidate_points) if rounded_candidate[i] not in rounded_observed]
 
         def is_within_range(value, allowed_range):
@@ -502,7 +516,7 @@ Hyperparameter configuration:"""
                 return min_val <= value <= max_val
             elif value_type == 'ordinal':
                 # check that value is in allowed range up to 2 decimal places
-                return any(math.isclose(value, x, abs_tol=1e-2) for x in allowed_range[2])
+                return any(x for x in allowed_range[2])
             else:
                 raise Exception('Unknown hyperparameter value type')
 
@@ -552,11 +566,14 @@ Hyperparameter configuration:"""
 
             while desired_fval <= .00001:  # score can't be negative
                 # try first alpha in alpha_range that is lower than current alpha
+                original_fval = desired_fval
                 for alpha_ in alpha_range:
                     if alpha_ < alpha:
                         alpha = alpha_  # new alpha
                         desired_fval = self.observed_best - alpha*range
                         break
+                if original_fval == desired_fval:
+                    break
             print(f'Adjusted alpha: {alpha} | [original alpha: {self.alpha}], desired fval: {desired_fval:.6f}')
         else:
             self.observed_best = np.max(observed_fvals.values)
@@ -564,11 +581,14 @@ Hyperparameter configuration:"""
             desired_fval = self.observed_best + alpha*range
 
             while desired_fval >= .9999:  # accuracy can't be greater than 1
+                original_fval = desired_fval
                 for alpha_ in alpha_range:
                     if alpha_ < alpha:
                         alpha = alpha_  # new alpha
                         desired_fval = self.observed_best + alpha*range
                         break
+                if original_fval == desired_fval:
+                    break
 
             print(f'Adjusted alpha: {alpha} | [original alpha: {self.alpha}], desired fval: {desired_fval:.6f}')
 
@@ -642,7 +662,7 @@ Hyperparameter configuration:"""
     
 
 class GenerativeSurrogateModel:
-    def __init__(self, task_context, n_gens, lower_is_better, top_pct,
+    def __init__(self, config: Config, task_context, n_gens, lower_is_better, top_pct,
                  n_templates=1, rate_limiter=None, 
                  verbose=False, chat_engine=None):
         '''Initialize the forward LLM surrogate model. This is modelling p(y|x) as in GP/SMAC etc.'''
@@ -654,7 +674,7 @@ class GenerativeSurrogateModel:
         self.recalibrator = None
         self.chat_engine = chat_engine
         self.verbose = verbose
-        self.llm = create_llm_instance("openai"), 
+        self.llm = create_llm_instance(config.llms[0])
 
     async def _async_generate(self, few_shot_template, query_example, query_idx):
         '''Generate a response from the LLM async.'''
@@ -666,10 +686,7 @@ class GenerativeSurrogateModel:
         for retry in range(MAX_RETRIES):
             try:
                 resp = await self.llm.acompletion(
-                    messages=prompt,
-                    stream=False,
-                    max_tokens=500,
-                    format="text"
+                    messages=prompt
                 )
 
             except Exception as e:
@@ -844,47 +861,53 @@ class LLMBOSampler:
         self.query_storage = QueryStorage(config, self.namespace)
 
     def infer_relative_search_space(self, study: Study, trial: FrozenTrial):
-        search_space = self.config.tuner.search_space.build_distributions(self.config.tuner.tuner_params)
-
-        def flatten_distributions(d: dict) -> dict:
+        def flatten_dict(d: dict) -> dict:
             """Recursively extract all leaf BaseDistribution objects into a flat dict."""
             flat = {}
             for k, v in d.items():
                 if isinstance(v, dict):
-                    flat.update(flatten_distributions(v))
+                    flat.update(flatten_dict(v))
                 else:
                     flat[k] = v
             return flat
+        
+        search_space = self.config.tuner.search_space.build_distributions(self.config.tuner.tuner_params)
+        search_space = flatten_dict(search_space)
 
-        search_space = flatten_distributions(search_space)
+
         return search_space
 
     def sample_relative(self, study: Study, trial, search_space: dict):
         print(study, trial)
         if self._is_first_query():
             random_sample = self.search_space.sample_from_distributions(dists=search_space)
-            import pdb
-            pdb.set_trace()
+            self.query_storage.upsert(study.user_attrs.get("query"))
+
             return random_sample
         if self._is_first_trial(study):
             warm_start_point = self._warm_start(study)
-            self.query_storage.upsert(study.user_attrs.get("query"))
             return warm_start_point
 
+        task_context=self._make_task_context(search_space)
+
         acq = Aquisition(
-            task_context="",
+            self.config,
+            task_context=task_context,
             n_candidates=10,
             n_templates=1,
             lower_is_better=False
         )
         observed_configs, observed_fvals = self._extract_observations(study)
+        print("Observation:", observed_configs, observed_fvals)
         candidate_points, cost, time_taken = acq.get_candidate_points(
             observed_configs=observed_configs,
             observed_fvals=observed_fvals,
         )
+        print("Candidate:", candidate_points)
 
         surrogate_model = GenerativeSurrogateModel(
-            task_context="",
+            self.config,
+            task_context=task_context,
             n_gens=1,
             lower_is_better=False,
             top_pct=0.1,
@@ -900,16 +923,16 @@ class LLMBOSampler:
     def before_trial(self, study: Study, trial: FrozenTrial):
         pass
 
+    def after_trial(self, study: Study, trial: FrozenTrial, state, values):
+        pass
+
     def _is_first_query(self):
         is_first_query = (self.query_storage.size() == 0)
-        import pdb
-        pdb.set_trace()
+
         return is_first_query
 
     def _is_first_trial(self, study):
         is_first_trial = (len(study.get_trials(deepcopy=False)) == 0)
-        import pdb
-        pdb.set_trace()
         return is_first_trial
 
     def _warm_start(self, study, trial):
@@ -932,15 +955,14 @@ class LLMBOSampler:
     def sample_independent(self, study: Study, trial: FrozenTrial, name, distribution):
         raise NotImplementedError("I only support relative sampling")
 
-    def _extract_observations(study: Study):
+    def _extract_observations(self, study: Study):
         trials = study.get_trials(deepcopy=False)
 
         # 过滤成功完成的 trial
-        completed = [t for t in trials if t.state == optuna.trial.TrialState.COMPLETE]
+        completed = [t for t in trials if t.state == TrialState.COMPLETE]
 
         # configs → DataFrame
-        observed_configs = pd.DataFrame([t.params for t in completed])
-
+        observed_configs = pd.DataFrame([json.loads(t.user_attrs['flow']) for t in completed])
 
         # fvals → Series（支持单目标和多目标）
         if len(completed) > 0 and completed[0].values is not None:
@@ -951,3 +973,24 @@ class LLMBOSampler:
             observed_fvals = pd.Series([t.value for t in completed])
 
         return observed_configs, observed_fvals
+    
+    def _make_task_context(self, search_space: dict):
+        task_context = {
+            'model': 'RAG', 
+            'task': 'qa', 
+            'metric': 'F1_score', 
+            'lower_is_better': False, 
+            'hyperparameter_constraints': {}
+        }
+
+
+
+        for key, value in search_space.items():
+            if type(value) is CategoricalDistribution:
+                task_context['hyperparameter_constraints'][key] = ['ordinal', '', value.choices]
+            elif type(value) is IntDistribution:
+                task_context['hyperparameter_constraints'][key] = ['int', 'uniform', [value.low, value.high]]
+            elif type(value) is FloatDistribution:
+                task_context['hyperparameter_constraints'][key] = ['float', 'uniform', [value.low, value.high]]
+
+        return task_context
