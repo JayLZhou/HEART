@@ -1,4 +1,8 @@
-
+llms:
+  - api_type: "openai"
+    base_url: "https://api.siliconflow.cn/v1/chat/completions"
+    model: "Qwen/QwQ-32B"
+    api_key: "sk-kpacfuoklmioauxqlqrpityhhbjarjqcpiknxleuvizduyxm"
 
 
 embedding:
@@ -25,7 +29,7 @@ force_rebuild: False
 vdb_type: faiss  # vector/colbert
 sparse_index_type: bm25
 tuner_type: bo
-num_trials: 1
+num_trials: 3
 # Chunk Config 
 chunk:
   chunk_token_size: 1200

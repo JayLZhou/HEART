@@ -80,11 +80,11 @@ class SearchSpace(BaseModel):
       
 
 
-        if params is not None:
-            reduced_distributions = {
-                key: val for key, val in distributions.items() if key in params
-            }
-            return reduced_distributions
+        # if params is not None:
+        #     reduced_distributions = {
+        #         key: val for key, val in distributions.items() if key in params
+        #     }
+        #     return reduced_distributions
    
         return distributions
 

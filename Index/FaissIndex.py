@@ -68,8 +68,8 @@ class FaissIndex(BaseIndex):
         text_embeddings = self.embedding_model._get_text_embeddings(texts)
 
         # 32 is the default value of hnsw index
-        import pdb
-        pdb.set_trace()
+        # import pdb
+        # pdb.set_trace()
         vector_store = FaissVectorStore(faiss_index=faiss.IndexHNSWFlat(self.config.dimensions, 32))
         storage_context = StorageContext.from_defaults(vector_store=vector_store)
 

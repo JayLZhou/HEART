@@ -17,7 +17,23 @@ from Storage.NameSpace import Workspace, Namespace
 from Storage.OptunaStorage import OptunaStorage
 
 
-     
+def wrap_params(params: dict):
+    out = {}
+    rag = {}
+    reranker = {}
+
+    for key, value in params.items():
+        if key.startswith("rag_"):
+            rest = key[len("rag_"):]    # 去掉 rag_ 前缀
+            rag[rest] = value
+        elif key.startswith("reranker_"):
+            reranker[key] = value
+        else:
+            out[key] = value
+
+    out["rag_retriever"] = rag
+    out["reranker"] = reranker
+    return out     
 
 
 class OptunaTuner(BasicBOTuner):
@@ -59,7 +75,7 @@ class OptunaTuner(BasicBOTuner):
     def _create_tuner(self, query: dict) -> Study:
         """Get a study instance for optuna"""
         # study_name = self.config.tuner.name
-        study_name = hashlib.sha256(json.dumps(query, sort_keys=True).encode()).hexdigest()
+        study_name = query['id']
 
 
         # if self.config.tuner.reuse_study:
@@ -79,6 +95,9 @@ class OptunaTuner(BasicBOTuner):
             pass
         
         sampler = self.get_sampler()
+        print(query, study_name, self.storage.get_storage())
+        # import pdb
+        # pdb.set_trace()
         study = optuna.create_study(
             study_name=study_name,
             directions=["maximize"],
@@ -101,7 +120,6 @@ class OptunaTuner(BasicBOTuner):
             study.set_user_attr(attr, value)
 
 
-    
 
 
 
@@ -111,21 +129,24 @@ class OptunaTuner(BasicBOTuner):
         if self.config.tuner.optimization.sampler == "llmbo":
             sampler = self.get_sampler()
             search_space = sampler.infer_relative_search_space(study=None, trial=None)
-            study_name = hashlib.sha256(json.dumps(query, sort_keys=True).encode()).hexdigest()
+            study_name = query['id']
+            print(query, study_name, self.storage.get_storage())
+            # import pdb
+            # pdb.set_trace()
             study = optuna.load_study(
                 study_name=study_name,
                 storage=self.storage.get_storage(),
             )
-            import pdb
-            pdb.set_trace()
+            # import pdb
+            # pdb.set_trace()
             params = sampler.sample_relative(study, trial, search_space)
         else:
             search_space = self.config.tuner.search_space
             params = search_space.sample(trial, self.config.tuner.tuner_params)
 
 
-        import pdb
-        pdb.set_trace()
+        # import pdb
+        # pdb.set_trace()
 
         print(f"TRIAL: {params}")
 
@@ -133,7 +154,9 @@ class OptunaTuner(BasicBOTuner):
             trial.set_user_attr(f"suggested:{k}", v)
 
         try:   
-            flow = self.builder.build_flow(params)
+            # import pdb
+            # pdb.set_trace()
+            flow = self.builder.build_flow(wrap_params(params))
             response = flow.query(query["question"])
             query["output"] = response
             metrics = self.evaluator.evaluate_single(query)
@@ -156,15 +179,15 @@ class OptunaTuner(BasicBOTuner):
                 query=query
             )
         self._tuner.tell(trial, [metrics[self.config.tuner.optimization.objective_1_name]])
-        import pdb
-        pdb.set_trace()
+        # import pdb
+        # pdb.set_trace()
         return metrics
 
 
     def _set_trial(self, trial: optuna.trial.FrozenTrial | optuna.trial.Trial, metrics: T.Dict[str, float] | None = None, flow_json: str | None = None, query: dict | None = None):
         if metrics:
             for metric_name, score in metrics.items():
-                trial.set_user_attr("metric_" + metric_name, score)   
+                trial.set_user_attr("metric_" + metric_name, score * 0.01)   
         if flow_json:
                 trial.set_user_attr("flow", flow_json)
         if query:

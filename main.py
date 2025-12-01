@@ -52,14 +52,15 @@ def seed_everything(seed):
     torch.cuda.manual_seed_all(seed)
 
 
-def wrapper_tuning(tuner):
+def wrapper_tuning():
  
     logger.info("Starting RAG tuning: query level")
     dataset_len = len(dataset)
-    dataset_len = 1
+    dataset_len = 3
     for _, idx in enumerate(range(dataset_len)):
         results = []
         query = dataset[idx]
+        tuner = get_tuner(config=opt, builder=builder, evaluator=evaluator, query=query)
         for i in tqdm(range(num_trials), desc="Running trials"):
             logger.info(f"Running trial {i+1}/{num_trials}")
             try:
@@ -81,8 +82,7 @@ if __name__ == "__main__":
     builder.build_indexing(corpus)
     evaluator = Evaluator(eval_path=os.path.join(opt.working_dir, opt.exp_name, "Results", "results.json"), dataset_name=opt.dataset_name)
 
-    tuner = get_tuner(config=opt, builder=builder, evaluator=evaluator, query=dataset[0])
     # Online RAG tuning
-    wrapper_tuning(tuner)
+    wrapper_tuning()
 
 
