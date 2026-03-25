@@ -11,6 +11,7 @@ from Common.Logger import logger
 from Tuner.BOTuner.HierarchicalTPE import HierarchicalTPESampler
 from Tuner.BOTuner.BasicBOTuner import BasicBOTuner
 from Tuner.BOTuner.LLMBO import LLMBOSampler
+from Tuner.BOTuner.LGBO import LGBOSampler
 from Pipeline.FlowBuild import FlowBuilder
 from Utils.Evaluation import Evaluator
 from Storage.NameSpace import Workspace, Namespace
@@ -63,6 +64,10 @@ class OptunaTuner(BasicBOTuner):
             )
         elif self.config.tuner.optimization.sampler == "llmbo":
             return LLMBOSampler(
+                config=self.config,
+            )
+        elif self.config.tuner.optimization.sampler == "lgbo":
+            return LGBOSampler(
                 config=self.config,
             )
         else:
@@ -126,7 +131,7 @@ class OptunaTuner(BasicBOTuner):
     def __call__(self, query):
         trial = self._tuner.ask()
         params = trial.params
-        if self.config.tuner.optimization.sampler == "llmbo":
+        if self.config.tuner.optimization.sampler in {"llmbo", "lgbo"}:
             sampler = self.get_sampler()
             search_space = sampler.infer_relative_search_space(study=None, trial=None)
             study_name = query['id']
