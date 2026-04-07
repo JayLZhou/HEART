@@ -40,6 +40,7 @@ def wrap_params(params: dict):
 class OptunaTuner(BasicBOTuner):
     def __init__(self, config: Config, builder: FlowBuilder, evaluator: Evaluator, query: dict):
         self.config = config
+        self._align_llm_choices_to_config()
         self.builder = builder
         self.evaluator = evaluator
         self.workspace = Workspace(self.config.working_dir, self.config.exp_name)
@@ -49,6 +50,31 @@ class OptunaTuner(BasicBOTuner):
         # self._tuner = self._create_tuner()
         
         self._tuner = self._create_tuner(query)
+
+    def _align_llm_choices_to_config(self) -> None:
+        available_llm_names = [llm.model for llm in self.config.llms]
+        if not available_llm_names:
+            return
+
+        def keep_available(names):
+            filtered = [name for name in names if name in available_llm_names]
+            return filtered or available_llm_names.copy()
+
+        self.config.tuner.search_space.response_synthesizer_llms = keep_available(
+            self.config.tuner.search_space.response_synthesizer_llms
+        )
+        self.config.tuner.search_space.rag_retriever.query_decomposition.llm_names = keep_available(
+            self.config.tuner.search_space.rag_retriever.query_decomposition.llm_names
+        )
+        self.config.retriever.query_decomposition.llm_names = keep_available(
+            self.config.retriever.query_decomposition.llm_names
+        )
+        self.config.query.subquestion_engine_llms = keep_available(
+            self.config.query.subquestion_engine_llms
+        )
+        self.config.query.subquestion_response_synthesizer_llms = keep_available(
+            self.config.query.subquestion_response_synthesizer_llms
+        )
 
     def get_sampler(self) -> optuna.samplers.BaseSampler:
         if self.config.tuner.optimization.sampler == "tpe":
@@ -73,43 +99,51 @@ class OptunaTuner(BasicBOTuner):
         else:
             raise ValueError("Invalid sampler")
 
+    def _share_history_across_queries(self) -> bool:
+        return self.config.tuner.optimization.sampler == "lgbo"
 
-       
-
+    def _study_name_for_query(self, query: dict) -> str:
+        if self._share_history_across_queries():
+            return f"{self.config.exp_name}__lgbo_shared_history"
+        return str(query["id"])
 
     def _create_tuner(self, query: dict) -> Study:
         """Get a study instance for optuna"""
-        # study_name = self.config.tuner.name
-        study_name = query['id']
-
-
-        # if self.config.tuner.reuse_study:
-        #     logger.info(
-        #         "Reusing study '%s' or creating new one", study_name
-        #     )
-        #     if self.config.tuner.recreate_study:
-        #         self.recreate_with_completed_trials(self.config, self.storage.get_storage())
-     
-
-        try:
-            optuna.delete_study(
-                study_name=study_name,
-                storage=self.storage.get_storage(),
-            )
-        except KeyError:
-            pass
-        
+        study_name = self._study_name_for_query(query)
+        storage = self.storage.get_storage()
         sampler = self.get_sampler()
-        print(query, study_name, self.storage.get_storage())
-        # import pdb
-        # pdb.set_trace()
-        study = optuna.create_study(
-            study_name=study_name,
-            directions=["maximize"],
-            sampler=sampler,
-            storage=self.storage.get_storage(),
-        )
+        print(query, study_name, storage)
+        if self._share_history_across_queries():
+            try:
+                study = optuna.load_study(
+                    study_name=study_name,
+                    storage=storage,
+                    sampler=sampler,
+                )
+            except KeyError:
+                study = optuna.create_study(
+                    study_name=study_name,
+                    directions=["maximize"],
+                    sampler=sampler,
+                    storage=storage,
+                )
+        else:
+            try:
+                optuna.delete_study(
+                    study_name=study_name,
+                    storage=storage,
+                )
+            except KeyError:
+                pass
+            study = optuna.create_study(
+                study_name=study_name,
+                directions=["maximize"],
+                sampler=sampler,
+                storage=storage,
+            )
         study.set_user_attr("query", query)
+        if self._share_history_across_queries():
+            study.set_user_attr("history_scope", "cross_query_shared")
 
         # self.save_config(study, self.study_config)
         return study
@@ -134,7 +168,7 @@ class OptunaTuner(BasicBOTuner):
         if self.config.tuner.optimization.sampler in {"llmbo", "lgbo"}:
             sampler = self.get_sampler()
             search_space = sampler.infer_relative_search_space(study=None, trial=None)
-            study_name = query['id']
+            study_name = self._study_name_for_query(query)
             print(query, study_name, self.storage.get_storage())
             # import pdb
             # pdb.set_trace()
@@ -192,7 +226,13 @@ class OptunaTuner(BasicBOTuner):
     def _set_trial(self, trial: optuna.trial.FrozenTrial | optuna.trial.Trial, metrics: T.Dict[str, float] | None = None, flow_json: str | None = None, query: dict | None = None):
         if metrics:
             for metric_name, score in metrics.items():
-                trial.set_user_attr("metric_" + metric_name, score * 0.01)   
+                if isinstance(score, bool):
+                    stored_score = score
+                elif isinstance(score, (int, float)):
+                    stored_score = score * 0.01
+                else:
+                    stored_score = score
+                trial.set_user_attr("metric_" + metric_name, stored_score)
         if flow_json:
                 trial.set_user_attr("flow", flow_json)
         if query:

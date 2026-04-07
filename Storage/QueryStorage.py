@@ -28,6 +28,12 @@ class QueryStorage(BaseStorage):
     def size(self):
         return len(self._key_to_text)
 
+    def _get_query_key(self, query: dict):
+        key = query.get("_id", query.get("id"))
+        if key is None:
+            return None
+        return str(key)
+
     # --------------------------
     # INSERT
     # --------------------------
@@ -35,7 +41,9 @@ class QueryStorage(BaseStorage):
         """Insert a text document. Automatically embeds and store in FAISS."""
 
         # 记录文本与 metadata
-        key, text = query["_id"], query["question"]
+        key, text = self._get_query_key(query), query["question"]
+        if key is None:
+            raise KeyError("Query must contain either '_id' or 'id'")
         self._key_to_text[key] = text
         self._key_to_metadata[key] = query
 
@@ -62,7 +70,9 @@ class QueryStorage(BaseStorage):
 
         for query in queries:
 
-            key, text = query["_id"], query["question"]
+            key, text = self._get_query_key(query), query["question"]
+            if key is None:
+                raise KeyError("Query must contain either '_id' or 'id'")
             self._key_to_text[key] = text
             self._key_to_metadata[key] = query
 
@@ -87,7 +97,7 @@ class QueryStorage(BaseStorage):
 
         final = []
         for r in results:
-            key = r.node.metadata.get("_id")
+            key = r.node.metadata.get("_id", r.node.metadata.get("id"))
             score = r.score
             text = self._key_to_text.get(key, "")
 

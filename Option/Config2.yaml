@@ -2,28 +2,28 @@
 # Multiple LLM configurations pool (model name is the unique key)
 llms:
   - api_type: "openai"
-    base_url: "https://api.siliconflow.cn/v1/chat/completions"
-    model: "Qwen/QwQ-32B"
-    api_key: "sk-kpacfuoklmioauxqlqrpityhhbjarjqcpiknxleuvizduyxm"
-  - api_type: "openai"
-    base_url: "https://cfcus02.opapi.win/v1"
-    model: "TA/meta-llama/Llama-3-8b-chat-hf"
-    api_key: "sk-LGORY9rX516364f6fd78T3BLbKFJ0cD7f508E7aF41C0a769"
-  - api_type: "openai"
-    base_url: "https://cfcus02.opapi.win/v1"
-    model: "gpt-4o-mini"
-    api_key: "sk-LGORY9rX516364f6fd78T3BLbKFJ0cD7f508E7aF41C0a769"
-  - api_type: "openai"
-    base_url: "https://cfcus02.opapi.win/v1"
-    model: "gpt-4o"
-    api_key: "sk-LGORY9rX516364f6fd78T3BLbKFJ0cD7f508E7aF41C0a769"
+    base_url: "https://api.siliconflow.cn/v1"
+    model: "Qwen/Qwen3-8B"
+    api_key: "${SILICONFLOW_API_KEY}"
+  # - api_type: "openai"
+  #   base_url: "https://cfcus02.opapi.win/v1"
+  #   model: "TA/meta-llama/Llama-3-8b-chat-hf"
+  #   api_key: "${OPAPI_API_KEY}"
+  # - api_type: "openai"
+  #   base_url: "https://cfcus02.opapi.win/v1"
+  #   model: "gpt-4o-mini"
+  #   api_key: "${OPAPI_API_KEY}"
+  # - api_type: "openai"
+  #   base_url: "https://cfcus02.opapi.win/v1"
+  #   model: "gpt-4o"
+  #   api_key: "${OPAPI_API_KEY}"
 
 
 embedding:
   api_type: "modelscope"  # or  ollama / etc.
   base_url: "http://localhost:8007/v1"  # or forward url / other llm url
-  api_key: "sk-LGORY9rX516364f6fd78T3BLbKFJ0cD7f508E7aF41C0a769"
-  # api_key: "sk-STmQ0VyP26d5093497aET3BLbkFJAB535192D50E4dB8AeC8"
+  api_key: "${EMBEDDING_API_KEY}"
+  # api_key: "${EMBEDDING_API_KEY:-YOUR_API_KEY}"
   model: "Qwen3-Embedding-0.6B"
   cache_folder: ""
   dimensions: 1024

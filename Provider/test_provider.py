@@ -1,9 +1,16 @@
+import os
+import asyncio
+
 from Config.LLMConfig import LLMConfig, LLMType
 from Provider.LLMProviderRegister import create_llm_instance
 
+api_key = os.getenv("SILICONFLOW_API_KEY")
+if not api_key:
+    raise ValueError("Please set SILICONFLOW_API_KEY in the environment or .env")
+
 config = LLMConfig(
-    model="Qwen/QwQ-32B",
-    api_key="sk-kpacfuoklmioauxqlqrpityhhbjarjqcpiknxleuvizduyxm",
+    model="Qwen/Qwen3-8B",
+    api_key=api_key,
     base_url="https://api.siliconflow.cn/v1",
     temperature=0.3,
     max_token=4096,
@@ -11,8 +18,6 @@ config = LLMConfig(
 )
 
 llm = create_llm_instance(config)
-
-import asyncio
 
 async def test_llm():
     rsp = await llm.acompletion_text(

@@ -15,8 +15,7 @@ from Storage.NameSpace import Workspace, Namespace
 from Storage.OptunaStorage import OptunaStorage
 
 from Provider.LLMProviderRegister import create_llm_instance
-
-from langchain import FewShotPromptTemplate, PromptTemplate
+from langchain_core.prompts import FewShotPromptTemplate, PromptTemplate
 
 def _count_decimal_places(n):
     '''Count the number of decimal places in a number.'''
@@ -443,6 +442,7 @@ Hyperparameter configuration:"""
 
                 break
             except Exception as e:
+              
                 print(f'[AF] RETRYING LLM REQUEST {retry+1}/{MAX_RETRIES}...')
                 print(resp)
                 print(e)
@@ -450,8 +450,8 @@ Hyperparameter configuration:"""
         if resp is None:
             return None
 
-        tot_tokens = resp['usage']['total_tokens']
-        tot_cost = 0.0015*(resp['usage']['prompt_tokens']/1000) + 0.002*(resp['usage']['completion_tokens']/1000)
+        tot_tokens = resp.usage.total_tokens
+        tot_cost = 0.0015*(resp.usage.prompt_tokens/1000) + 0.002*(resp.usage.completion_tokens/1000)
 
         return resp, tot_cost, tot_tokens
 
@@ -681,7 +681,6 @@ class GenerativeSurrogateModel:
         prompt = few_shot_template.format(Q=query_example['Q'])
 
         MAX_RETRIES = 3
-
         resp = None
         for retry in range(MAX_RETRIES):
             try:

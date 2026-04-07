@@ -1,15 +1,15 @@
 llms:
   - api_type: "openai"
-    base_url: "https://api.siliconflow.cn/v1/chat/completions"
-    model: "Qwen/QwQ-32B"
-    api_key: "sk-kpacfuoklmioauxqlqrpityhhbjarjqcpiknxleuvizduyxm"
+    base_url: "https://api.siliconflow.cn/v1"
+    model: "Qwen/Qwen3-8B"
+    api_key: "${SILICONFLOW_API_KEY}"
 
 
 embedding:
   api_type: "modelscope"  # or  ollama / etc.
   base_url: "http://localhost:8007/v1"  # or forward url / other llm url
-  api_key: "sk-LGORY9rX516364f6fd78T3BLbKFJ0cD7f508E7aF41C0a769"
-  # api_key: "sk-STmQ0VyP26d5093497aET3BLbkFJAB535192D50E4dB8AeC8"
+  api_key: "${EMBEDDING_API_KEY}"
+  # api_key: "${EMBEDDING_API_KEY:-YOUR_API_KEY}"
   model: "Qwen3-Embedding-0.6B"
   cache_folder: ""
   dimensions: 1024

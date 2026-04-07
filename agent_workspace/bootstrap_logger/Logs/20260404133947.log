@@ -1,0 +1,241 @@
+2026-04-04 13:39:49.188 | INFO     | Chunk.DocChunk:build_chunks:28 - Starting chunk the given documents
+2026-04-04 13:39:49.417 | INFO     | Storage.ChunkKVStorage:_persist:106 - Writing data into /home/yingli/Youran/HEART/agent_workspace/lgbo_cross_query_5records_5trials_retry1/chunk_storage_chunk_data_idx.pkl and /home/yingli/Youran/HEART/agent_workspace/lgbo_cross_query_5records_5trials_retry1/chunk_storage_chunk_data_key.pkl
+2026-04-04 13:39:49.422 | INFO     | Chunk.DocChunk:build_chunks:75 - ✅ Finished the chunking stage
+2026-04-04 13:39:49.424 | INFO     | Index.BaseIndex:build_index:13 - Starting insert elements of the given graph into vector database
+2026-04-04 13:39:49.426 | INFO     | Index.BaseIndex:build_index:25 - Building index for input elements
+2026-04-04 13:39:49.434 | INFO     | Index.FaissIndex:_update_index:65 - Generating embeddings for 994 texts...
+2026-04-04 13:39:52.611 | INFO     | Index.FaissIndex:_update_index:90 - refresh index size is 994
+2026-04-04 13:39:52.626 | INFO     | Index.BaseIndex:build_index:28 - Index successfully built and stored.
+2026-04-04 13:39:52.626 | INFO     | Index.BaseIndex:build_index:29 - ✅ Finished starting insert entities of the given graph into vector database
+2026-04-04 13:39:52.626 | INFO     | Index.BaseIndex:build_index:13 - Starting insert elements of the given graph into vector database
+2026-04-04 13:39:52.626 | INFO     | Index.BaseIndex:build_index:25 - Building index for input elements
+2026-04-04 13:39:52.901 | INFO     | Index.BMIndex:_update_index:102 - BM25 index built with k1=1.2, b=0.5, size=994.
+2026-04-04 13:39:52.915 | INFO     | Index.BMIndex:_storage_index:156 - BM25 index saved to /home/yingli/Youran/HEART/agent_workspace/lgbo_cross_query_5records_5trials_retry1/sparse_index, size=994
+2026-04-04 13:39:52.915 | INFO     | Index.BaseIndex:build_index:28 - Index successfully built and stored.
+2026-04-04 13:39:52.915 | INFO     | Index.BaseIndex:build_index:29 - ✅ Finished starting insert entities of the given graph into vector database
+2026-04-04 13:39:52.946 | INFO     | Tuner.TunerFactory:_create_bo_tuner:59 - Creating BO-based tuner (Optuna)
+2026-04-04 13:39:54.861 | WARNING  | tenacity.after:log_it:44 - Finished call to 'Provider.OpenaiApi.OpenAILLM.acompletion_text' after 1.586(s), this was the 1st time calling it.
+2026-04-04 13:39:56.434 | WARNING  | tenacity.after:log_it:44 - Finished call to 'Provider.OpenaiApi.OpenAILLM.acompletion_text' after 3.158(s), this was the 2nd time calling it.
+2026-04-04 13:39:59.164 | WARNING  | tenacity.after:log_it:44 - Finished call to 'Provider.OpenaiApi.OpenAILLM.acompletion_text' after 5.888(s), this was the 3rd time calling it.
+2026-04-04 13:40:02.306 | WARNING  | tenacity.after:log_it:44 - Finished call to 'Provider.OpenaiApi.OpenAILLM.acompletion_text' after 9.030(s), this was the 4th time calling it.
+2026-04-04 13:40:07.813 | WARNING  | tenacity.after:log_it:44 - Finished call to 'Provider.OpenaiApi.OpenAILLM.acompletion_text' after 14.537(s), this was the 5th time calling it.
+2026-04-04 13:40:19.611 | WARNING  | tenacity.after:log_it:44 - Finished call to 'Provider.OpenaiApi.OpenAILLM.acompletion_text' after 26.335(s), this was the 6th time calling it.
+2026-04-04 13:40:19.611 | ERROR    | Common.Utils:log_and_reraise:113 - Retry attempts exhausted. Last exception: Connection error.
+2026-04-04 13:40:19.611 | WARNING  | Common.Utils:log_and_reraise:114 - 
+Recommend going to https://deepwisdom.feishu.cn/wiki/MsGnwQBjiif9c3koSJNcYaoSnu4#part-XdatdVlhEojeAfxaaEZcMV3ZniQ
+See FAQ 5.8
+
+2026-04-04 13:40:19.962 | INFO     | Rerank.Reranking:_initialize_reranker:53 - ✅ Successfully initialized flashrank reranker with model ms-marco-MiniLM-L-12-v2
+2026-04-04 13:40:19.979 | DEBUG    | Rerank.Flashrank:_pairwisecrossencoding:345 - Running pairwise ranking..
+2026-04-04 13:40:20.596 | DEBUG    | Pipeline.RAGFlow:prompt_template:42 - Creating prompt template from '%s'
+2026-04-04 13:40:21.850 | WARNING  | tenacity.after:log_it:44 - Finished call to 'Provider.OpenaiApi.OpenAILLM.acompletion_text' after 1.253(s), this was the 1st time calling it.
+2026-04-04 13:40:23.942 | WARNING  | tenacity.after:log_it:44 - Finished call to 'Provider.OpenaiApi.OpenAILLM.acompletion_text' after 3.345(s), this was the 2nd time calling it.
+2026-04-04 13:40:27.214 | WARNING  | tenacity.after:log_it:44 - Finished call to 'Provider.OpenaiApi.OpenAILLM.acompletion_text' after 6.617(s), this was the 3rd time calling it.
+2026-04-04 13:40:31.751 | WARNING  | tenacity.after:log_it:44 - Finished call to 'Provider.OpenaiApi.OpenAILLM.acompletion_text' after 11.154(s), this was the 4th time calling it.
+2026-04-04 13:40:37.784 | WARNING  | tenacity.after:log_it:44 - Finished call to 'Provider.OpenaiApi.OpenAILLM.acompletion_text' after 17.187(s), this was the 5th time calling it.
+2026-04-04 13:40:42.890 | WARNING  | tenacity.after:log_it:44 - Finished call to 'Provider.OpenaiApi.OpenAILLM.acompletion_text' after 22.293(s), this was the 6th time calling it.
+2026-04-04 13:40:42.890 | ERROR    | Common.Utils:log_and_reraise:113 - Retry attempts exhausted. Last exception: Connection error.
+2026-04-04 13:40:42.891 | WARNING  | Common.Utils:log_and_reraise:114 - 
+Recommend going to https://deepwisdom.feishu.cn/wiki/MsGnwQBjiif9c3koSJNcYaoSnu4#part-XdatdVlhEojeAfxaaEZcMV3ZniQ
+See FAQ 5.8
+
+2026-04-04 13:40:42.891 | ERROR    | Tuner.BOTuner.OptunaTuner:__call__:204 - Objective had an unhandled exception: %s
+Traceback (most recent call last):
+
+  File "/home/yingli/lib/python3.11/site-packages/httpx/_transports/default.py", line 72, in map_httpcore_exceptions
+    yield
+  File "/home/yingli/lib/python3.11/site-packages/httpx/_transports/default.py", line 377, in handle_async_request
+    resp = await self._pool.handle_async_request(req)
+                 │    │     │                    └ <Request [b'POST']>
+                 │    │     └ <function AsyncConnectionPool.handle_async_request at 0x74fbebb83560>
+                 │    └ <AsyncConnectionPool [Requests: 0 active, 0 queued | Connections: 0 active, 0 idle]>
+                 └ <httpx.AsyncHTTPTransport object at 0x74fb333afe50>
+  File "/home/yingli/lib/python3.11/site-packages/httpcore/_async/connection_pool.py", line 216, in handle_async_request
+    raise exc from None
+  File "/home/yingli/lib/python3.11/site-packages/httpcore/_async/connection_pool.py", line 196, in handle_async_request
+    response = await connection.handle_async_request(
+                     │          └ <function AsyncHTTPConnection.handle_async_request at 0x74fbebb80c20>
+                     └ <AsyncHTTPConnection [CONNECTION FAILED]>
+  File "/home/yingli/lib/python3.11/site-packages/httpcore/_async/connection.py", line 99, in handle_async_request
+    raise exc
+  File "/home/yingli/lib/python3.11/site-packages/httpcore/_async/connection.py", line 76, in handle_async_request
+    stream = await self._connect(request)
+                   │    │        └ <Request [b'POST']>
+                   │    └ <function AsyncHTTPConnection._connect at 0x74fbebb82840>
+                   └ <AsyncHTTPConnection [CONNECTION FAILED]>
+  File "/home/yingli/lib/python3.11/site-packages/httpcore/_async/connection.py", line 122, in _connect
+    stream = await self._network_backend.connect_tcp(**kwargs)
+                   │    │                │             └ {'host': 'api.siliconflow.cn', 'port': 443, 'local_address': None, 'timeout': 600, 'socket_options': None}
+                   │    │                └ <function AutoBackend.connect_tcp at 0x74fbebb80900>
+                   │    └ <httpcore._backends.auto.AutoBackend object at 0x74fb333b6a10>
+                   └ <AsyncHTTPConnection [CONNECTION FAILED]>
+  File "/home/yingli/lib/python3.11/site-packages/httpcore/_backends/auto.py", line 30, in connect_tcp
+    return await self._backend.connect_tcp(
+                 │    │        └ <function AnyIOBackend.connect_tcp at 0x74fbebba2c00>
+                 │    └ <httpcore.AnyIOBackend object at 0x74fb1f64d7d0>
+                 └ <httpcore._backends.auto.AutoBackend object at 0x74fb333b6a10>
+  File "/home/yingli/lib/python3.11/site-packages/httpcore/_backends/anyio.py", line 115, in connect_tcp
+    with map_exceptions(exc_map):
+         │              └ {<class 'TimeoutError'>: <class 'httpcore.ConnectTimeout'>, <class 'OSError'>: <class 'httpcore.ConnectError'>, <class 'anyio...
+         └ <function map_exceptions at 0x74fbebf263e0>
+  File "/home/yingli/anaconda3/envs/graphrag/lib/python3.11/contextlib.py", line 158, in __exit__
+    self.gen.throw(typ, value, traceback)
+    │    │   │     │    │      └ <traceback object at 0x74fb1f51f080>
+    │    │   │     │    └ gaierror(-3, 'Temporary failure in name resolution')
+    │    │   │     └ <class 'socket.gaierror'>
+    │    │   └ <method 'throw' of 'generator' objects>
+    │    └ <generator object map_exceptions at 0x74fb1ff95b40>
+    └ <contextlib._GeneratorContextManager object at 0x74fb1f531cd0>
+  File "/home/yingli/lib/python3.11/site-packages/httpcore/_exceptions.py", line 14, in map_exceptions
+    raise to_exc(exc) from exc
+          └ <class 'httpcore.ConnectError'>
+
+httpcore.ConnectError: [Errno -3] Temporary failure in name resolution
+
+
+The above exception was the direct cause of the following exception:
+
+
+Traceback (most recent call last):
+
+  File "/home/yingli/lib/python3.11/site-packages/openai/_base_client.py", line 1529, in request
+    response = await self._client.send(
+                     │    │       └ <function AsyncClient.send at 0x74fbebbb65c0>
+                     │    └ <openai._base_client.AsyncHttpxClientWrapper object at 0x74fb333a9f10>
+                     └ <openai.AsyncOpenAI object at 0x74fb333aee10>
+  File "/home/yingli/lib/python3.11/site-packages/httpx/_client.py", line 1674, in send
+    response = await self._send_handling_auth(
+                     │    └ <function AsyncClient._send_handling_auth at 0x74fbebbb6660>
+                     └ <openai._base_client.AsyncHttpxClientWrapper object at 0x74fb333a9f10>
+  File "/home/yingli/lib/python3.11/site-packages/httpx/_client.py", line 1702, in _send_handling_auth
+    response = await self._send_handling_redirects(
+                     │    └ <function AsyncClient._send_handling_redirects at 0x74fbebbb6700>
+                     └ <openai._base_client.AsyncHttpxClientWrapper object at 0x74fb333a9f10>
+  File "/home/yingli/lib/python3.11/site-packages/httpx/_client.py", line 1739, in _send_handling_redirects
+    response = await self._send_single_request(request)
+                     │    │                    └ <Request('POST', 'https://api.siliconflow.cn/v1/chat/completions')>
+                     │    └ <function AsyncClient._send_single_request at 0x74fbebbb67a0>
+                     └ <openai._base_client.AsyncHttpxClientWrapper object at 0x74fb333a9f10>
+  File "/home/yingli/lib/python3.11/site-packages/httpx/_client.py", line 1776, in _send_single_request
+    response = await transport.handle_async_request(request)
+                     │         │                    └ <Request('POST', 'https://api.siliconflow.cn/v1/chat/completions')>
+                     │         └ <function AsyncHTTPTransport.handle_async_request at 0x74fbebba36a0>
+                     └ <httpx.AsyncHTTPTransport object at 0x74fb333afe50>
+  File "/home/yingli/lib/python3.11/site-packages/httpx/_transports/default.py", line 376, in handle_async_request
+    with map_httpcore_exceptions():
+         └ <function map_httpcore_exceptions at 0x74fbebb53a60>
+  File "/home/yingli/anaconda3/envs/graphrag/lib/python3.11/contextlib.py", line 158, in __exit__
+    self.gen.throw(typ, value, traceback)
+    │    │   │     │    │      └ <traceback object at 0x74fb1f51c580>
+    │    │   │     │    └ ConnectError(gaierror(-3, 'Temporary failure in name resolution'))
+    │    │   │     └ <class 'httpcore.ConnectError'>
+    │    │   └ <method 'throw' of 'generator' objects>
+    │    └ <generator object map_httpcore_exceptions at 0x74fb1ff95e40>
+    └ <contextlib._GeneratorContextManager object at 0x74fb1f64c250>
+  File "/home/yingli/lib/python3.11/site-packages/httpx/_transports/default.py", line 89, in map_httpcore_exceptions
+    raise mapped_exc(message) from exc
+          │          └ '[Errno -3] Temporary failure in name resolution'
+          └ <class 'httpx.ConnectError'>
+
+httpx.ConnectError: [Errno -3] Temporary failure in name resolution
+
+
+The above exception was the direct cause of the following exception:
+
+
+Traceback (most recent call last):
+
+  File "<stdin>", line 70, in <module>
+
+> File "/home/yingli/Youran/HEART/Tuner/BOTuner/OptunaTuner.py", line 199, in __call__
+    response = flow.query(query["question"])
+               │    │     └ {'id': 0, 'question': 'what is one of the stars of  The Newcomers known for', 'answer': 'superhero roles as the Marvel Comics...
+               │    └ <function RAGFlow.query at 0x74fb3c5e8a40>
+               └ <Pipeline.RAGFlow.RAGFlow object at 0x74fb1fbc0990>
+
+  File "/home/yingli/Youran/HEART/Pipeline/RAGFlow.py", line 84, in query
+    response = self.response_synthesizer_llm.ask(msg=instruction)
+               │    │                        │       └ '\nContext information is below.\n---------------------\nThe Newcomers is a 2000 American family drama film directed by James...
+               │    │                        └ <function BaseLLM.ask at 0x74fb3e34fb00>
+               │    └ <Provider.OpenaiApi.OpenAILLM object at 0x74fd18f88750>
+               └ <Pipeline.RAGFlow.RAGFlow object at 0x74fb1fbc0990>
+
+  File "/home/yingli/Youran/HEART/Provider/BaseLLM.py", line 180, in ask
+    rsp = loop.run_until_complete(
+          │    └ <function BaseEventLoop.run_until_complete at 0x74fd89d2b4c0>
+          └ <_UnixSelectorEventLoop running=False closed=False debug=False>
+
+  File "/home/yingli/anaconda3/envs/graphrag/lib/python3.11/asyncio/base_events.py", line 654, in run_until_complete
+    return future.result()
+           │      └ <method 'result' of '_asyncio.Task' objects>
+           └ <Task finished name='Task-5' coro=<OpenAILLM.acompletion_text() done, defined at /home/yingli/lib/python3.11/site-packages/te...
+  File "/home/yingli/lib/python3.11/site-packages/tenacity/asyncio/__init__.py", line 189, in async_wrapped
+    return await copy(fn, *args, **kwargs)
+                 │    │    │       └ {'stream': False, 'timeout': 600, 'max_tokens': None, 'format': 'text'}
+                 │    │    └ (<Provider.OpenaiApi.OpenAILLM object at 0x74fd18f88750>, [{'role': 'system', 'content': 'You are a helpful assistant.'}, {'r...
+                 │    └ <function OpenAILLM.acompletion_text at 0x74fb3e379440>
+                 └ <AsyncRetrying object at 0x74fb1f6ceb90 (stop=<tenacity.stop.stop_after_attempt object at 0x74fb40bfa950>, wait=<tenacity.wai...
+  File "/home/yingli/lib/python3.11/site-packages/tenacity/asyncio/__init__.py", line 111, in __call__
+    do = await self.iter(retry_state=retry_state)
+               │    │                └ <RetryCallState 128621912850128: attempt #6; slept for 14.34; last result: failed (APIConnectionError Connection error.)>
+               │    └ <function AsyncRetrying.iter at 0x74fbf01a74c0>
+               └ <AsyncRetrying object at 0x74fb1f6ceb90 (stop=<tenacity.stop.stop_after_attempt object at 0x74fb40bfa950>, wait=<tenacity.wai...
+  File "/home/yingli/lib/python3.11/site-packages/tenacity/asyncio/__init__.py", line 153, in iter
+    result = await action(retry_state)
+                   │      └ <RetryCallState 128621912850128: attempt #6; slept for 14.34; last result: failed (APIConnectionError Connection error.)>
+                   └ <function wrap_to_async_func.<locals>.inner at 0x74fb1f608720>
+  File "/home/yingli/lib/python3.11/site-packages/tenacity/_utils.py", line 99, in inner
+    return call(*args, **kwargs)
+           │     │       └ {}
+           │     └ (<RetryCallState 128621912850128: attempt #6; slept for 14.34; last result: failed (APIConnectionError Connection error.)>,)
+           └ <function log_and_reraise at 0x74fb48d1d3a0>
+
+  File "/home/yingli/Youran/HEART/Common/Utils.py", line 120, in log_and_reraise
+    raise retry_state.outcome.exception()
+          │           │       └ <function Future.exception at 0x74fd8c733060>
+          │           └ <Future at 0x74fb1f53d3d0 state=finished raised APIConnectionError>
+          └ <RetryCallState 128621912850128: attempt #6; slept for 14.34; last result: failed (APIConnectionError Connection error.)>
+
+  File "/home/yingli/lib/python3.11/site-packages/tenacity/asyncio/__init__.py", line 114, in __call__
+    result = await fn(*args, **kwargs)
+                   │   │       └ {'stream': False, 'timeout': 600, 'max_tokens': None, 'format': 'text'}
+                   │   └ (<Provider.OpenaiApi.OpenAILLM object at 0x74fd18f88750>, [{'role': 'system', 'content': 'You are a helpful assistant.'}, {'r...
+                   └ <function OpenAILLM.acompletion_text at 0x74fb3e379440>
+
+  File "/home/yingli/Youran/HEART/Provider/OpenaiApi.py", line 157, in acompletion_text
+    rsp = await self._achat_completion(messages, timeout=self.get_timeout(timeout), max_tokens = max_tokens)
+                │    │                 │                 │    │           │                      └ None
+                │    │                 │                 │    │           └ 600
+                │    │                 │                 │    └ <function BaseLLM.get_timeout at 0x74fb3e378900>
+                │    │                 │                 └ <Provider.OpenaiApi.OpenAILLM object at 0x74fd18f88750>
+                │    │                 └ [{'role': 'system', 'content': 'You are a helpful assistant.'}, {'role': 'user', 'content': '\nContext information is below.\...
+                │    └ <function OpenAILLM._achat_completion at 0x74fb3e379120>
+                └ <Provider.OpenaiApi.OpenAILLM object at 0x74fd18f88750>
+
+  File "/home/yingli/Youran/HEART/Provider/OpenaiApi.py", line 138, in _achat_completion
+    rsp: ChatCompletion = await self.aclient.chat.completions.create(**kwargs)
+                                │    │       │    │           │        └ {'messages': [{'role': 'system', 'content': 'You are a helpful assistant.'}, {'role': 'user', 'content': '\nContext informati...
+                                │    │       │    │           └ <function AsyncCompletions.create at 0x74fb22de22a0>
+                                │    │       │    └ <openai.resources.chat.completions.completions.AsyncCompletions object at 0x74fb1f6bddd0>
+                                │    │       └ <openai.resources.chat.chat.AsyncChat object at 0x74fb1f6c1010>
+                                │    └ <openai.AsyncOpenAI object at 0x74fb333aee10>
+                                └ <Provider.OpenaiApi.OpenAILLM object at 0x74fd18f88750>
+
+  File "/home/yingli/lib/python3.11/site-packages/openai/resources/chat/completions/completions.py", line 2589, in create
+    return await self._post(
+                 │    └ <bound method AsyncAPIClient.post of <openai.AsyncOpenAI object at 0x74fb333aee10>>
+                 └ <openai.resources.chat.completions.completions.AsyncCompletions object at 0x74fb1f6bddd0>
+  File "/home/yingli/lib/python3.11/site-packages/openai/_base_client.py", line 1794, in post
+    return await self.request(cast_to, opts, stream=stream, stream_cls=stream_cls)
+                 │    │       │        │            │                  └ openai.AsyncStream[openai.types.chat.chat_completion_chunk.ChatCompletionChunk]
+                 │    │       │        │            └ False
+                 │    │       │        └ FinalRequestOptions(method='post', url='/chat/completions', params={}, headers=NOT_GIVEN, max_retries=NOT_GIVEN, timeout=600,...
+                 │    │       └ <class 'openai.types.chat.chat_completion.ChatCompletion'>
+                 │    └ <function AsyncAPIClient.request at 0x74fbea2937e0>
+                 └ <openai.AsyncOpenAI object at 0x74fb333aee10>
+  File "/home/yingli/lib/python3.11/site-packages/openai/_base_client.py", line 1561, in request
+    raise APIConnectionError(request=request) from err
+          │                          └ <Request('POST', 'https://api.siliconflow.cn/v1/chat/completions')>
+          └ <class 'openai.APIConnectionError'>
+
+openai.APIConnectionError: Connection error.

@@ -1,0 +1,28 @@
+2026-04-04 12:15:15.449 | INFO     | Chunk.DocChunk:build_chunks:28 - Starting chunk the given documents
+2026-04-04 12:15:15.709 | INFO     | Storage.ChunkKVStorage:_persist:106 - Writing data into /home/yingli/Youran/HEART/agent_workspace/lgbo_surrogate_same_query_3trials/chunk_storage_chunk_data_idx.pkl and /home/yingli/Youran/HEART/agent_workspace/lgbo_surrogate_same_query_3trials/chunk_storage_chunk_data_key.pkl
+2026-04-04 12:15:15.715 | INFO     | Chunk.DocChunk:build_chunks:75 - ✅ Finished the chunking stage
+2026-04-04 12:15:15.716 | INFO     | Index.BaseIndex:build_index:13 - Starting insert elements of the given graph into vector database
+2026-04-04 12:15:15.719 | INFO     | Index.BaseIndex:build_index:25 - Building index for input elements
+2026-04-04 12:15:15.729 | INFO     | Index.FaissIndex:_update_index:65 - Generating embeddings for 994 texts...
+2026-04-04 12:15:47.810 | INFO     | Index.FaissIndex:_update_index:90 - refresh index size is 994
+2026-04-04 12:15:47.829 | INFO     | Index.BaseIndex:build_index:28 - Index successfully built and stored.
+2026-04-04 12:15:47.829 | INFO     | Index.BaseIndex:build_index:29 - ✅ Finished starting insert entities of the given graph into vector database
+2026-04-04 12:15:47.830 | INFO     | Index.BaseIndex:build_index:13 - Starting insert elements of the given graph into vector database
+2026-04-04 12:15:47.830 | INFO     | Index.BaseIndex:build_index:25 - Building index for input elements
+2026-04-04 12:15:48.153 | INFO     | Index.BMIndex:_update_index:102 - BM25 index built with k1=1.2, b=0.5, size=994.
+2026-04-04 12:15:48.170 | INFO     | Index.BMIndex:_storage_index:156 - BM25 index saved to /home/yingli/Youran/HEART/agent_workspace/lgbo_surrogate_same_query_3trials/sparse_index, size=994
+2026-04-04 12:15:48.170 | INFO     | Index.BaseIndex:build_index:28 - Index successfully built and stored.
+2026-04-04 12:15:48.171 | INFO     | Index.BaseIndex:build_index:29 - ✅ Finished starting insert entities of the given graph into vector database
+2026-04-04 12:15:48.214 | INFO     | Tuner.TunerFactory:_create_bo_tuner:59 - Creating BO-based tuner (Optuna)
+2026-04-04 12:16:45.302 | INFO     | Rerank.Reranking:_initialize_reranker:53 - ✅ Successfully initialized flashrank reranker with model ms-marco-MiniLM-L-12-v2
+2026-04-04 12:16:45.487 | DEBUG    | Rerank.Flashrank:_pairwisecrossencoding:345 - Running pairwise ranking..
+2026-04-04 12:16:46.703 | DEBUG    | Pipeline.RAGFlow:prompt_template:42 - Creating prompt template from '%s'
+2026-04-04 12:16:49.463 | WARNING  | Common.CostManager:update_cost:49 - Model Qwen/Qwen3-8B not found in TOKEN_COSTS.
+2026-04-04 12:17:23.100 | INFO     | Rerank.Reranking:_initialize_reranker:53 - ✅ Successfully initialized flashrank reranker with model ms-marco-MiniLM-L-12-v2
+2026-04-04 12:17:23.126 | DEBUG    | Rerank.Flashrank:_pairwisecrossencoding:345 - Running pairwise ranking..
+2026-04-04 12:17:24.157 | DEBUG    | Pipeline.RAGFlow:prompt_template:42 - Creating prompt template from '%s'
+2026-04-04 12:17:29.342 | WARNING  | Common.CostManager:update_cost:49 - Model Qwen/Qwen3-8B not found in TOKEN_COSTS.
+2026-04-04 12:18:59.176 | INFO     | Rerank.Reranking:_initialize_reranker:53 - ✅ Successfully initialized flashrank reranker with model ms-marco-MiniLM-L-12-v2
+2026-04-04 12:18:59.251 | DEBUG    | Rerank.Flashrank:_pairwisecrossencoding:345 - Running pairwise ranking..
+2026-04-04 12:19:01.546 | DEBUG    | Pipeline.RAGFlow:prompt_template:42 - Creating prompt template from '%s'
+2026-04-04 12:19:04.295 | WARNING  | Common.CostManager:update_cost:49 - Model Qwen/Qwen3-8B not found in TOKEN_COSTS.
