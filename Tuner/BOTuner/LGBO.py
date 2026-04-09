@@ -13,7 +13,10 @@ from Provider.LLMProviderRegister import create_llm_instance
 from Tuner.BOTuner.lgbo_components.candidate import LGBOCandidateGenerator
 from Tuner.BOTuner.lgbo_components.history import LGBOHistoryAdapter
 from Tuner.BOTuner.lgbo_components.preference import LGBOPreferenceParser, LGBOPreferencePlanner
-from Tuner.BOTuner.lgbo_components.search_space import NumericSearchSpaceAdapter
+from Tuner.BOTuner.lgbo_components.search_space import (
+    CategoricalSearchSpaceAdapter,
+    NumericSearchSpaceAdapter,
+)
 from Tuner.BOTuner.lgbo_components.trace_store import LGBOTraceStore
 
 
@@ -30,6 +33,7 @@ class LGBOSampler:
         self.search_space = config.tuner.search_space
         self.history = LGBOHistoryAdapter()
         self.numeric_space = NumericSearchSpaceAdapter()
+        self.categorical_space = CategoricalSearchSpaceAdapter()
         self.preference_parser = LGBOPreferenceParser()
         self.preference_planner = LGBOPreferencePlanner()
         self.trace_store = LGBOTraceStore()
@@ -52,13 +56,19 @@ class LGBOSampler:
     def sample_relative(self, study: Study, trial: FrozenTrial, search_space: Dict[str, BaseDistribution]) -> Dict[str, Any]:
         numeric_search_space = self.numeric_space.filter_numeric_distributions(search_space)
         numeric_specs = self.numeric_space.build_specs(numeric_search_space)
-        if not numeric_specs:
+        categorical_search_space = self.categorical_space.filter_categorical_distributions(
+            search_space,
+            exclude_names={"response_synthesizer_llm", "rag_query_decomposition_llm_name"},
+        )
+        categorical_specs = self.categorical_space.build_specs(categorical_search_space)
+        if not numeric_specs and not categorical_specs:
             return self.search_space.sample_from_distributions(dists=search_space)
 
         completed_trials = self.history.completed_trials(study)
+        selected_param_names = [spec.name for spec in numeric_specs] + [spec.name for spec in categorical_specs]
         observations = self.history.observations_from_trials(
             completed_trials,
-            numeric_param_names=[spec.name for spec in numeric_specs],
+            param_names=selected_param_names,
         )
         observed_configs = self.history.observed_configs(observations)
         objective_name = getattr(self.config.tuner.optimization, "objective_1_name", "objective")
@@ -77,18 +87,22 @@ class LGBOSampler:
         reasoning = previous_reasoning
 
         try:
+            param_specs = [spec.__dict__ for spec in numeric_specs] + [spec.__dict__ for spec in categorical_specs]
             prompt = build_lgbo_numeric_prompt(
                 query_text=query_text,
                 objective_name=objective_name,
-                param_specs=[spec.__dict__ for spec in numeric_specs],
+                param_specs=param_specs,
                 history_lines=history_lines,
                 previous_reasoning=previous_reasoning,
             )
             raw_response = self._call_llm(prompt)
             if raw_response:
-                preference, parsed_trace = self.preference_parser.parse_with_metadata(raw_response, numeric_specs)
+                preference, parsed_trace = self.preference_parser.parse_with_metadata(
+                    raw_response,
+                    [*numeric_specs, *categorical_specs],
+                )
                 reasoning = parsed_trace.get("thinking") or previous_reasoning
-                plan = self.preference_planner.make_plan(preference, numeric_specs)
+                plan = self.preference_planner.make_plan(preference, [*numeric_specs, *categorical_specs])
         except Exception as exc:
             plan = {
                 "mode": "numeric_v1_fallback",
@@ -106,6 +120,7 @@ class LGBOSampler:
 
         params = self.search_space.sample_from_distributions(dists=search_space)
         params.update(candidate)
+        params.update(self._select_categorical_values(plan, observations, categorical_specs))
         self.trace_store.write(
             trial,
             raw=raw_response,
@@ -155,4 +170,28 @@ class LGBOSampler:
             return loop.run_until_complete(coro)
         finally:
             loop.close()
+
+    def _select_categorical_values(self, plan, observations, categorical_specs):
+        if not categorical_specs:
+            return {}
+
+        selected = {}
+        plan_values = (plan or {}).get("categorical", {})
+        for spec in categorical_specs:
+            value = plan_values.get(spec.name)
+            if value in spec.choices:
+                selected[spec.name] = value
+
+        if len(selected) == len(categorical_specs):
+            return selected
+
+        best_observation = self.history.best_observation(observations, higher_is_better=True)
+        if best_observation is not None:
+            for spec in categorical_specs:
+                if spec.name in selected:
+                    continue
+                value = best_observation.params.get(spec.name)
+                if value in spec.choices:
+                    selected[spec.name] = value
+        return selected
 

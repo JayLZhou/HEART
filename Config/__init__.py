@@ -10,6 +10,7 @@ from Config.TunerConfig import (
 )
 from Config.OptimizationConfig import OptimizationConfig
 from Config.SearchSpace import SearchSpace
+from Config.FaissConfig import FaissSearchSpace
 
 __all__ = [
     "EmbeddingConfig",
@@ -23,4 +24,5 @@ __all__ = [
     "Evaluation",
     "OptimizationConfig",
     "SearchSpace",
+    "FaissSearchSpace",
 ]

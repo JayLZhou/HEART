@@ -1573,50 +1573,53 @@ I started the LGBO implementation with a dependency-light V1 skeleton.
 ### Current LGBO Optimization Surface
 
 - Important distinction:
-  - the full Optuna trial contains both categorical and numeric knobs
-  - the current LGBO implementation is still `numeric-only` on the surrogate side
-  - categorical fields can still vary in the final trial config, but they are not modeled by the current GP/acquisition loop
+  - the full Optuna trial still contains both categorical and numeric knobs
+  - the current LGBO implementation is no longer purely numeric at the full sampler level
+  - but the GP surrogate / acquisition path is still numeric-only
+  - some categorical fields are now optimized by the prompt-guided LGBO layer
+  - other categorical fields are still only sampled / fixed and are not optimized by the current LGBO logic
 
-#### Parameters currently modeled by the LGBO surrogate
+#### Parameters currently optimized by the current LGBO implementation
 
-- The current surrogate only consumes distributions that are `IntDistribution` or `FloatDistribution`.
-- In the current HEART search space and current `5x5` run, those numeric parameters are:
-  - `rag_top_k`
-    - range: `2 .. 128`
-    - step: `1`
-  - `rag_hybrid_bm25_weight`
-    - range: `0.1 .. 0.9`
-    - step: `0.1`
-  - `rag_query_decomposition_num_queries`
-    - range: `2 .. 20`
-    - step: `2`
-  - `reranker_top_k`
-    - range: `2 .. 128`
-    - step: `1`
-- These are the parameters that are:
-  - included in `numeric_specs`
-  - summarized into LGBO history lines
-  - passed into the LLM preference parser/planner
-  - modeled by the GP surrogate
-  - proposed by the acquisition-driven candidate generator
+| Parameter | Type | Current optimization status | Search space / effective values |
+| --- | --- | --- | --- |
+| `template_name` | categorical | optimized by LGBO prompt-guided categorical selection | `["default", "concise", "cot", "rag_qa"]` |
+| `rag_method` | categorical | optimized by LGBO prompt-guided categorical selection | `["dense", "sparse", "hybrid"]` |
+| `rag_query_decomposition_enabled` | categorical | optimized by LGBO prompt-guided categorical selection | `[True, False]` |
+| `rag_fusion_mode` | categorical | optimized by LGBO prompt-guided categorical selection | `["simple", "reciprocal_rerank", "relative_score", "dist_based_score"]` |
+| `reranker_choice` | categorical | optimized by LGBO prompt-guided categorical selection | the current 10 explicit `method::model_alias` combinations |
+| `rag_top_k` | integer | optimized by LGBO surrogate + acquisition | `2 .. 128`, step `1` |
+| `rag_hybrid_bm25_weight` | float | optimized by LGBO surrogate + acquisition | `0.1 .. 0.9`, step `0.1` |
+| `rag_query_decomposition_num_queries` | integer | optimized by LGBO surrogate + acquisition | `2 .. 20`, step `2` |
+| `reranker_top_k` | integer | optimized by LGBO surrogate + acquisition | `2 .. 128`, step `1` |
 
-#### Parameters present in the overall trial but not modeled by the current surrogate
+#### Candidate vdb / HNSW parameters to add next
 
-- The following trial fields can still vary in the final Optuna config, but are not part of the current numeric LGBO surrogate:
-  - `template_name`
+These are not yet in the current optimization path, but the current FAISS backend
+already uses HNSW internally, so these are natural next parameters to expose.
+
+| Parameter | Type | Current status | Suggested candidate values / search space |
+| --- | --- | --- | --- |
+| `vdb_type` | categorical | not yet added to the current optimization path | `["faiss"]` for the first HNSW-focused phase; later could expand to `["vector", "faiss"]` |
+| `faiss_hnsw_m` | integer | not yet added; current code is effectively hard-coded to `32` | `16 .. 64`, step `8` |
+| `faiss_hnsw_ef_search` | integer | not yet added; no current config surface | `32 .. 256`, step `32` |
+| `faiss_hnsw_ef_construction` | integer | not yet added; no current config surface | `40 .. 320`, step `40` |
+| `faiss_metric` | categorical | not yet added; no current config surface | `["l2", "inner_product"]` |
+
+#### Fixed LLM choices
+
+- The two LLM-identity fields are no longer treated as part of the practical optimization surface in this setup:
   - `response_synthesizer_llm`
-  - `rag_method`
-  - `rag_query_decomposition_enabled`
   - `rag_query_decomposition_llm_name`
-  - `rag_fusion_mode`
-  - `reranker_name`
+- Both are fixed to the current active model pool choice:
+  - `Qwen/Qwen3-8B`
 
 #### Effective parameter freedom in the non-sandbox 5x5 run
 
 - Because the run was intentionally restricted for stability, some categorical dimensions were effectively fixed to one choice:
   - `response_synthesizer_llm = Qwen/Qwen3-8B`
   - `rag_query_decomposition_llm_name = Qwen/Qwen3-8B`
-  - `reranker_name = flashrank`
+  - reranker family was effectively fixed to `flashrank` in that earlier run
 - The parameters that still visibly changed across completed trials in this run were:
   - categorical / boolean:
     - `template_name`
@@ -1633,8 +1636,82 @@ I started the LGBO implementation with a dependency-light V1 skeleton.
 
 - So the cleanest summary is:
   - the trial-level search space is mixed categorical + numeric
-  - but the current LGBO surrogate/acquisition path is only optimizing the four numeric knobs above
-  - categorical behavior is still outside the current surrogate model
+  - the current LGBO implementation now optimizes:
+    - five categorical knobs through prompt-guided selection
+    - four numeric knobs through the surrogate/acquisition path
+  - the surrogate itself is still numeric-only
+  - the two LLM-identity fields are treated as fixed environment choices rather than optimization variables in this setup
 - This matches the intended scope of the current implementation phase:
-  - keep LGBO numerical for now
-  - get real shared-history surrogate behavior working first
+  - expand beyond purely numeric behavior while keeping LLM-pool selection fixed to the current active model
+
+## 2026-04-08
+
+### FAISS / HNSW Optimization Surface Update
+
+- Implemented the next requested search-space expansion for the HNSW-focused phase.
+- `vdb_type` is now treated as fixed infrastructure choice rather than as a tuned variable:
+  - default config now uses `vdb_type = "faiss"`
+  - this keeps the optimization surface focused on FAISS-only HNSW behavior for this pass
+- Added the following FAISS parameters as explicit search-space parameters:
+  - `faiss_hnsw_m`
+  - `faiss_hnsw_ef_search`
+  - `faiss_hnsw_ef_construction`
+  - `faiss_metric`
+
+#### Current parameter table after the update
+
+| Parameter | Type | Current optimization status | Search space / effective values |
+| --- | --- | --- | --- |
+| `template_name` | categorical | optimized by LGBO prompt-guided categorical selection | `["default", "concise", "cot", "rag_qa"]` |
+| `rag_method` | categorical | optimized by LGBO prompt-guided categorical selection | `["dense", "sparse", "hybrid"]` |
+| `rag_query_decomposition_enabled` | categorical | optimized by LGBO prompt-guided categorical selection | `[True, False]` |
+| `rag_fusion_mode` | categorical | optimized by LGBO prompt-guided categorical selection | `["simple", "reciprocal_rerank", "relative_score", "dist_based_score"]` |
+| `reranker_choice` | categorical | optimized by LGBO prompt-guided categorical selection | the current 10 explicit `method::model_alias` combinations |
+| `faiss_metric` | categorical | optimized by LGBO prompt-guided categorical selection | `["l2", "inner_product"]` |
+| `rag_top_k` | integer | optimized by LGBO surrogate + acquisition | `2 .. 128`, step `1` |
+| `rag_query_decomposition_num_queries` | integer | optimized by LGBO surrogate + acquisition | `2 .. 20`, step `2` |
+| `reranker_top_k` | integer | optimized by LGBO surrogate + acquisition | `2 .. 128`, step `1` |
+| `faiss_hnsw_m` | integer | optimized by LGBO surrogate + acquisition | `16 .. 64`, step `8` |
+| `faiss_hnsw_ef_search` | integer | optimized by LGBO surrogate + acquisition | `32 .. 256`, step `32` |
+| `faiss_hnsw_ef_construction` | integer | optimized by LGBO surrogate + acquisition | `40 .. 320`, step `40` |
+| `rag_hybrid_bm25_weight` | float | optimized by LGBO surrogate + acquisition | `0.1 .. 0.9`, step `0.1` |
+
+#### Code-path double check for the new FAISS parameters
+
+- Verified at the code level that `vdb_type = "faiss"` is now the default active backend:
+  - `Option/Config2.py` default is `faiss`
+  - `Option/Config2.yaml`, `Option/TPEBO.yaml`, and `Option/LLMBO.yaml` also point to `faiss`
+- Verified that the new FAISS parameters are exposed through the tuner search-space layer:
+  - `Config/FaissConfig.py` defines defaults and Optuna distributions
+  - `Config/SearchSpace.py` includes them when `"faiss"` is present in `tuner_params`
+  - `Config/TunerConfig.py` now includes `"faiss"` in the default `tuner_params`
+- Verified that the new FAISS parameters flow into runtime index config:
+  - `Index/Schema.py` now contains `hnsw_m`, `hnsw_ef_search`, `hnsw_ef_construction`, and `metric`
+  - `Index/IndexConfigFactory.py` maps the trial/config values into `FAISSIndexConfig`
+- Verified that the parameters are actually consumed by the FAISS backend:
+  - `Index/FaissIndex.py` now builds `faiss.IndexHNSWFlat(dim, m, metric)`
+  - and sets:
+    - `hnsw.efSearch`
+    - `hnsw.efConstruction`
+- Verified that trial-level parameter changes are not just sampled but also applied:
+  - `Pipeline/FlowBuild.py` now derives effective FAISS params from the sampled trial params
+  - computes a parameter-signature-specific dense-index persist path
+  - and rebuilds / reuses the matching FAISS index for that parameter combination
+
+#### Practical interpretation of the double check
+
+- For this pass, `vdb_type = "faiss"` should run through a coherent code path rather than falling back to the generic vector backend.
+- The newly added FAISS parameters are no longer just documentation targets:
+  - they now exist in config
+  - exist in the Optuna/LGBO search space
+  - flow into runtime index construction
+  - and affect retrieval-time FAISS behavior
+
+#### Verification note
+
+- I was able to run `py_compile` successfully over the touched Python files after the integration.
+- I was not able to run the full unit test suite in the current environment because `optuna` is missing from the local Python environment here.
+- So the current confidence level is:
+  - strong code-path verification
+  - syntax verification passed
+  - full runtime experiment verification for the new FAISS parameters is still pending

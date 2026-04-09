@@ -31,7 +31,11 @@ class Config(WorkingParams, YamlModel):
 
     # Basic Config
     force_rebuild: bool = False
-    vdb_type: str = "vector"  # vector/colbert
+    vdb_type: str = "faiss"  # vector/colbert/faiss
+    faiss_hnsw_m: int = 32
+    faiss_hnsw_ef_search: int = 64
+    faiss_hnsw_ef_construction: int = 40
+    faiss_metric: str = "l2"
     sparse_index_type: str = "bm25"  # bm25
     tuner_type: TunerType = TunerType.BO
     token_model: str = "gpt-3.5-turbo"

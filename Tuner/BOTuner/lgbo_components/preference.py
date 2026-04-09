@@ -5,19 +5,22 @@ from dataclasses import dataclass
 import re
 from typing import Any, Dict, Sequence
 
-from Tuner.BOTuner.lgbo_components.search_space import NumericParamSpec
+from Tuner.BOTuner.lgbo_components.search_space import CategoricalParamSpec, NumericParamSpec
+
+
+ParamSpec = NumericParamSpec | CategoricalParamSpec
 
 
 @dataclass(frozen=True)
 class PointPreference:
-    values: Dict[str, float]
+    values: Dict[str, Any]
     confidence: float
 
 
 @dataclass(frozen=True)
 class RegionPreference:
-    lower: Dict[str, float]
-    upper: Dict[str, float]
+    lower: Dict[str, Any]
+    upper: Dict[str, Any]
     confidence: float
 
 
@@ -35,11 +38,11 @@ THINKING_RE = re.compile(
 class LGBOPreferenceParser:
     """Parse the paper-style LGBO point/region outputs."""
 
-    def parse(self, raw_text: str, specs: Sequence[NumericParamSpec]) -> Preference:
+    def parse(self, raw_text: str, specs: Sequence[ParamSpec]) -> Preference:
         preference, _ = self.parse_with_metadata(raw_text, specs)
         return preference
 
-    def parse_with_metadata(self, raw_text: str, specs: Sequence[NumericParamSpec]) -> tuple[Preference, Dict[str, Any]]:
+    def parse_with_metadata(self, raw_text: str, specs: Sequence[ParamSpec]) -> tuple[Preference, Dict[str, Any]]:
         final_answer = self.extract_final_answer(raw_text)
         data = self._parse_literal(final_answer)
         thinking = self.extract_thinking(raw_text)
@@ -102,7 +105,7 @@ class LGBOPreferenceParser:
             )
             return ast.literal_eval(normalized)
 
-    def _coerce_region_payload(self, payload: Any, specs: Sequence[NumericParamSpec]) -> Any:
+    def _coerce_region_payload(self, payload: Any, specs: Sequence[ParamSpec]) -> Any:
         if not isinstance(payload, (list, tuple)):
             return payload
         if len(payload) == 2 and all(isinstance(item, (list, tuple)) for item in payload):
@@ -113,44 +116,70 @@ class LGBOPreferenceParser:
             return [lower, upper]
         return payload
 
-    def _zip_values(self, values: Sequence[Any], specs: Sequence[NumericParamSpec]) -> Dict[str, float]:
+    def _zip_values(self, values: Sequence[Any], specs: Sequence[ParamSpec]) -> Dict[str, Any]:
         if len(values) != len(specs):
             raise ValueError(f"Expected {len(specs)} values, got {len(values)}")
-        return {spec.name: float(value) for spec, value in zip(specs, values)}
+        out: Dict[str, Any] = {}
+        for spec, value in zip(specs, values):
+            if isinstance(spec, NumericParamSpec):
+                out[spec.name] = float(value)
+                continue
+            if value not in spec.choices:
+                raise ValueError(f"Invalid categorical value {value!r} for {spec.name}; expected one of {list(spec.choices)}")
+            out[spec.name] = value
+        return out
 
 
 class LGBOPreferencePlanner:
     """Convert parsed preference into a compact internal plan."""
 
-    def make_plan(self, preference: Preference, specs: Sequence[NumericParamSpec]) -> Dict[str, Any]:
+    def make_plan(self, preference: Preference, specs: Sequence[ParamSpec]) -> Dict[str, Any]:
+        numeric_specs = [spec for spec in specs if isinstance(spec, NumericParamSpec)]
+        categorical_specs = [spec for spec in specs if isinstance(spec, CategoricalParamSpec)]
+
         if isinstance(preference, PointPreference):
             confidence = float(preference.confidence)
             lower = {}
             upper = {}
-            for spec in specs:
+            for spec in numeric_specs:
                 width = spec.high - spec.low
                 radius = max(width * (0.05 + (1.0 - confidence) * 0.10), 1e-12)
                 center = float(preference.values[spec.name])
                 lower[spec.name] = max(spec.low, center - radius)
                 upper[spec.name] = min(spec.high, center + radius)
+            categorical = {
+                spec.name: preference.values[spec.name]
+                for spec in categorical_specs
+                if spec.name in preference.values
+            }
             return {
                 "mode": "region-soft",
-                "point": dict(preference.values),
+                "point": {spec.name: preference.values[spec.name] for spec in numeric_specs},
                 "lower": lower,
                 "upper": upper,
+                "categorical": categorical,
                 "confidence": confidence,
             }
         lower = {}
         upper = {}
-        for spec in specs:
+        categorical = {}
+        for spec in numeric_specs:
             lo = min(preference.lower[spec.name], preference.upper[spec.name])
             hi = max(preference.lower[spec.name], preference.upper[spec.name])
             lower[spec.name] = max(spec.low, lo)
             upper[spec.name] = min(spec.high, hi)
+        for spec in categorical_specs:
+            lo = preference.lower[spec.name]
+            hi = preference.upper[spec.name]
+            chosen = lo if lo in spec.choices else hi
+            if chosen not in spec.choices:
+                raise ValueError(f"Region preference used invalid categorical value for {spec.name}")
+            categorical[spec.name] = chosen
         return {
             "mode": "region",
             "lower": lower,
             "upper": upper,
+            "categorical": categorical,
             "confidence": float(preference.confidence),
         }
 

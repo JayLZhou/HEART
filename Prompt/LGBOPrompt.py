@@ -1,15 +1,11 @@
-"""Prompt helpers for LGBO.
-
-Keep the format intentionally simple in V1 so the prompt layer remains easy to
-test without requiring the full LGBO algorithm stack.
-"""
+"""Prompt helpers for LGBO."""
 
 from __future__ import annotations
 
 from typing import Iterable, Mapping, Sequence
 
 
-LGBO_NUMERIC_SYSTEM_PROMPT = """You are assisting a numeric hyperparameter optimization loop.
+LGBO_NUMERIC_SYSTEM_PROMPT = """You are assisting a hyperparameter optimization loop.
 
 Return exactly two blocks:
 
@@ -24,7 +20,10 @@ Final Answer:
 Rules:
 - confidence must be in [0, 1]
 - follow the declared parameter order exactly
-- keep all values inside the provided bounds
+- keep all numeric values inside the provided bounds
+- for categorical string values, use quoted Python string literals
+- for boolean values, use Python literals True / False
+- for categorical values in region mode, repeat the same literal in the lower and upper lists for that dimension
 - prefer region when uncertainty is high or a neighborhood appears promising
 - prefer point when the evidence supports a sharp recommendation
 """
@@ -50,7 +49,10 @@ def build_lgbo_numeric_prompt(
         "Parameter order:",
     ]
     for spec in param_specs:
-        lines.append(f"- {spec['name']}: [{spec['low']}, {spec['high']}] ({spec['kind']})")
+        if spec["kind"] in {"int", "float"}:
+            lines.append(f"- {spec['name']}: [{spec['low']}, {spec['high']}] ({spec['kind']})")
+        else:
+            lines.append(f"- {spec['name']}: choices={list(spec['choices'])} ({spec['kind']})")
     lines.append("")
     lines.append("Completed trial history:")
     has_history = False

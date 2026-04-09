@@ -34,7 +34,7 @@ class TunerConfig(BaseSettings):
         default="default", description="Name of the tuner."
     )
     tuner_params: T.List[str] = Field(
-        default_factory=lambda: ["template_name", "response_synthesizer_llm", "reranker", "rag_retriever", "reranker", "sub_question"],
+        default_factory=lambda: ["template_name", "response_synthesizer_llm", "reranker", "rag_retriever", "reranker", "faiss", "sub_question"],
         description="Parameters to tune."
     )
     evaluation: Evaluation = Field(

@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Sequence
 
-from optuna.distributions import FloatDistribution, IntDistribution
+from optuna.distributions import CategoricalDistribution, FloatDistribution, IntDistribution
 
 
 @dataclass(frozen=True)
@@ -14,6 +14,13 @@ class NumericParamSpec:
     high: float
     step: float | None = None
     log: bool = False
+
+
+@dataclass(frozen=True)
+class CategoricalParamSpec:
+    name: str
+    kind: str
+    choices: tuple[Any, ...]
 
 
 class NumericSearchSpaceAdapter:
@@ -84,3 +91,34 @@ class NumericSearchSpaceAdapter:
             value = max(spec.low, min(spec.high, value))
         return float(value)
 
+
+class CategoricalSearchSpaceAdapter:
+    """Filter and describe categorical parameters used by the prompt-guided path."""
+
+    def filter_categorical_distributions(
+        self,
+        search_space: Dict[str, Any],
+        *,
+        exclude_names: Iterable[str] | None = None,
+    ) -> Dict[str, CategoricalDistribution]:
+        excluded = set(exclude_names or [])
+        return {
+            name: dist
+            for name, dist in search_space.items()
+            if isinstance(dist, CategoricalDistribution) and name not in excluded
+        }
+
+    def build_specs(self, search_space: Dict[str, Any]) -> List[CategoricalParamSpec]:
+        specs: List[CategoricalParamSpec] = []
+        for name, dist in search_space.items():
+            if not isinstance(dist, CategoricalDistribution):
+                continue
+            kind = "bool" if all(isinstance(choice, bool) for choice in dist.choices) else "categorical"
+            specs.append(
+                CategoricalParamSpec(
+                    name=name,
+                    kind=kind,
+                    choices=tuple(dist.choices),
+                )
+            )
+        return specs

@@ -1,4 +1,5 @@
 import typing as T
+import hashlib
 from Index import get_index, get_index_config
 from Storage.NameSpace import Workspace
 from Chunk.DocChunk import DocChunk
@@ -20,19 +21,23 @@ class FlowBuilder(ContextMixin, BaseModel):
                 get_index_config(self.config, persist_path=self.workspace.make_for("chunk_vdb").get_save_path()))
         self.sparse_index = get_index(
                 get_index_config(self.config, persist_path=self.workspace.make_for("sparse_index").get_save_path(), type="sparse"))
+        self._dense_chunks = None
+        self._dense_index_signature = None
 
 
 
     def build_indexing(self, corpus):
-     
+      
         self.doc_chunk.build_chunks(corpus)
-        self.chunk_vdb.build_index(self.doc_chunk.get_chunks(), [], self.config.force_rebuild)
+        self._dense_chunks = self.doc_chunk.get_chunks()
+        self._ensure_dense_index({})
         self.sparse_index.build_index(self.doc_chunk.get_chunks(), [], self.config.force_rebuild)
 
     def build_flow(self, params: T.Dict[str, T.Any]):
         """Build the appropriate flow based on parameters.
         Only focus on online flow building.
         """
+        self._ensure_dense_index(params)
         # get response synthesizer llm
         # import pdb
         # pdb.set_trace()
@@ -85,5 +90,46 @@ class FlowBuilder(ContextMixin, BaseModel):
             )
    
         return  QueryFusionRetriever(**fusion_retriever_params)
+
+    def _effective_faiss_params(self, params: T.Dict[str, T.Any]) -> dict[str, T.Any]:
+        return {
+            "faiss_hnsw_m": int(params.get("faiss_hnsw_m", self.config.faiss_hnsw_m)),
+            "faiss_hnsw_ef_search": int(params.get("faiss_hnsw_ef_search", self.config.faiss_hnsw_ef_search)),
+            "faiss_hnsw_ef_construction": int(
+                params.get("faiss_hnsw_ef_construction", self.config.faiss_hnsw_ef_construction)
+            ),
+            "faiss_metric": str(params.get("faiss_metric", self.config.faiss_metric)),
+        }
+
+    def _dense_index_persist_path(self, faiss_params: dict[str, T.Any]) -> str:
+        signature = hashlib.md5(
+            repr(sorted(faiss_params.items())).encode("utf-8"),
+            usedforsecurity=False,
+        ).hexdigest()[:12]
+        return self.workspace.make_for("chunk_vdb").get_save_path(resource_name=signature)
+
+    def _ensure_dense_index(self, params: T.Dict[str, T.Any]) -> None:
+        if self.config.vdb_type != "faiss":
+            if self._dense_chunks is not None and self._dense_index_signature is None:
+                self.chunk_vdb.build_index(self._dense_chunks, [], self.config.force_rebuild)
+                self._dense_index_signature = "non_faiss"
+            return
+
+        if self._dense_chunks is None:
+            return
+
+        faiss_params = self._effective_faiss_params(params)
+        signature = repr(sorted(faiss_params.items()))
+        if signature == self._dense_index_signature:
+            return
+
+        index_config = self.config.model_copy(
+            update=faiss_params,
+            deep=True,
+        )
+        persist_path = self._dense_index_persist_path(faiss_params)
+        self.chunk_vdb = get_index(get_index_config(index_config, persist_path=persist_path))
+        self.chunk_vdb.build_index(self._dense_chunks, [], self.config.force_rebuild)
+        self._dense_index_signature = signature
 
       

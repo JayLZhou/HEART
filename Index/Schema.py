@@ -1,7 +1,7 @@
 """RAG schemas."""
 from enum import Enum
 from pathlib import Path
-from typing import Optional, Union
+from typing import Literal, Optional, Union
 
 from llama_index.core.embeddings import BaseEmbedding
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_validator
@@ -39,6 +39,10 @@ class ColBertIndexConfig(BaseIndexConfig):
 class FAISSIndexConfig(VectorIndexConfig):
     """Config for faiss-based index."""
     dimensions: int = Field(default=128, description="Dimensions of the embedding model.")
+    hnsw_m: int = Field(default=32, description="FAISS HNSW M parameter.")
+    hnsw_ef_search: int = Field(default=64, description="FAISS HNSW efSearch parameter.")
+    hnsw_ef_construction: int = Field(default=40, description="FAISS HNSW efConstruction parameter.")
+    metric: Literal["l2", "inner_product"] = Field(default="l2", description="FAISS metric type.")
 
 class BMIndexConfig(VectorIndexConfig):
     """Config for BM index."""

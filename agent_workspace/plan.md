@@ -127,3 +127,44 @@ Missing:
 - do not replace the lightweight candidate generator with the full BoTorch tilt posterior from `lgbo/prior.py`
 - do not change `OptunaTuner` public behavior
 - do not redesign the existing search-space interface
+
+## Parameter Table
+
+This section summarizes only the parameters that are already in the current
+optimization path. It distinguishes:
+
+- `optimized`: currently optimized by the LGBO logic itself
+- `not optimized`: currently present in the optimization path but only sampled /
+  passed through, not modeled or optimized by the current LGBO logic
+
+| Parameter | Type | Status | Search Space | Source |
+| --- | --- | --- | --- | --- |
+| `template_name` | categorical | not optimized | `["default", "concise", "cot", "rag_qa"]` | `Config/SearchSpace.py`, `Common/Constants.py` |
+| `response_synthesizer_llm` | categorical | not optimized | `config.tuner.search_space.response_synthesizer_llms`, filtered at runtime to the active `config.llms` pool | `Config/SearchSpace.py`, `Tuner/BOTuner/OptunaTuner.py` |
+| `rag_method` | categorical | not optimized | `["dense", "sparse", "hybrid"]` | `Config/RetrieverConfig.py` |
+| `rag_top_k` | integer | optimized | `TopK(kmax=128, log=True)`; actual current default range here is `Int[2, 128]`, log-style | `Config/SearchSpace.py`, `Config/RetrieverConfig.py`, `Config/TopKConfig.py`, `Tuner/BOTuner/LGBO.py` |
+| `rag_query_decomposition_enabled` | categorical | not optimized | `[True, False]` | `Config/RetrieverConfig.py` |
+| `rag_query_decomposition_llm_name` | categorical | not optimized | `query_decomposition.llm_names`, filtered at runtime to the active `config.llms` pool | `Config/RetrieverConfig.py`, `Tuner/BOTuner/OptunaTuner.py` |
+| `rag_query_decomposition_num_queries` | integer | optimized | `Int[2, 20], step=2` | `Config/RetrieverConfig.py`, `Tuner/BOTuner/LGBO.py` |
+| `rag_hybrid_bm25_weight` | float | optimized | `Float[0.1, 0.9], step=0.1` | `Config/RetrieverConfig.py`, `Tuner/BOTuner/LGBO.py` |
+| `rag_fusion_mode` | categorical | not optimized | `["simple", "reciprocal_rerank", "relative_score", "dist_based_score"]` | `Config/RetrieverConfig.py` |
+| `reranker_name` | categorical | not optimized | `["upr", "flashrank", "monot5", "rankt5", "listt5", "transformer_ranker", "colbert_ranker", "twolar", "echorank", "monobert_ranker", "inranker"]` | `Config/RerankConfig.py` |
+| `reranker_reranker_top_k` | integer | optimized | `TopK(kmax=128, log=True)`; actual current default range here is `Int[2, 128]`, log-style | `Config/RerankConfig.py`, `Config/TopKConfig.py`, `Tuner/BOTuner/LGBO.py` |
+
+### Notes
+
+- The current LGBO implementation filters the search space down to numeric
+  parameters before building history, prompts, preferences, and candidates.
+  That is why only the four numeric parameters above are marked `optimized`.
+- The categorical parameters above are still in the current optimization path:
+  they are sampled and passed into the flow, but they are not modeled by the
+  current LGBO logic.
+- `response_synthesizer_llm` and `rag_query_decomposition_llm_name` should be
+  aligned dynamically to the currently configured `config.llms` pool, not to
+  stale global defaults.
+- `reranker_name` is technically already a broad categorical space, but real
+  experiments may need a narrower subset because some heavy rerankers have
+  previously caused GPU OOM during smoke tests.
+- `Config/RetrieverConfig.py` currently contains a debug line that forces
+  `rag_method = "hybrid"` inside `sample()`. This should be treated as a known
+  distortion when using the non-custom sampler path.

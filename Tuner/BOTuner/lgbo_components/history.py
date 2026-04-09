@@ -34,12 +34,12 @@ class LGBOHistoryAdapter:
     def observations_from_trials(
         self,
         trials: Sequence[Any],
-        numeric_param_names: Sequence[str],
+        param_names: Sequence[str],
     ) -> List[LGBOObservation]:
         observations: List[LGBOObservation] = []
         for trial in trials:
             flow = self._extract_flow(trial)
-            params = self._extract_params(trial, flow, numeric_param_names)
+            params = self._extract_params(trial, flow, param_names)
             if not params:
                 continue
             objective = self._extract_objective(trial)
@@ -172,21 +172,21 @@ class LGBOHistoryAdapter:
         self,
         trial: Any,
         flow: Dict[str, Any] | None,
-        numeric_param_names: Sequence[str],
+        param_names: Sequence[str],
     ) -> Dict[str, Any]:
         trial_params = getattr(trial, "params", {}) or {}
-        params = {name: trial_params[name] for name in numeric_param_names if name in trial_params}
+        params = {name: trial_params[name] for name in param_names if name in trial_params}
         if params:
             return params
 
         if flow:
-            return {name: flow[name] for name in numeric_param_names if name in flow}
+            return {name: flow[name] for name in param_names if name in flow}
 
         user_attrs = getattr(trial, "user_attrs", {}) or {}
         suggested_prefix = "suggested:"
         return {
             name: user_attrs[f"{suggested_prefix}{name}"]
-            for name in numeric_param_names
+            for name in param_names
             if f"{suggested_prefix}{name}" in user_attrs
         }
 
