@@ -1,0 +1,96 @@
+llms:
+  - api_type: "openai"
+    base_url: "https://api.siliconflow.cn/v1"
+    model: "Qwen/Qwen2.5-7B-Instruct"
+    api_key: "${SILICONFLOW_API_KEY}"
+    timeout: 60
+
+embedding:
+  api_type: "modelscope"
+  base_url: "http://10.26.1.186:8004/v1"
+  api_key: "empty"
+  model: "Qwen3-Embedding-0.6B"
+  cache_folder: ""
+  dimensions: 1024
+  max_token_size: 8102
+  embed_batch_size: 64
+  target_devices: ["cpu"]
+  backend: "openai"
+  embedding_func_max_async: 16
+
+llm_model_max_token_size: 32768
+
+index_name: tree_graph_balanced
+force_rebuild: false
+vdb_type: faiss
+sparse_index_type: bm25
+faiss_hnsw_m: 32
+faiss_hnsw_ef_search: 64
+faiss_hnsw_ef_construction: 40
+faiss_metric: "l2"
+tuner_type: bo
+num_trials: 5
+
+chunk:
+  chunk_token_size: 1200
+  chunk_overlap_token_size: 100
+  token_model: gpt-3.5-turbo
+  chunk_method: chunking_by_token_size
+
+tuner:
+  name: lgbo
+  search_space:
+    # HNSW tuning disabled: keep index-build parameters fixed.
+    faiss_hnsw_m_values:
+      - 32
+    faiss_hnsw_ef_search_values:
+      - 64
+    faiss_hnsw_ef_construction_values:
+      - 40
+    faiss_metric_values:
+      - l2
+      - inner_product
+    response_synthesizer_llms:
+      - Qwen/Qwen2.5-7B-Instruct
+    rag_retriever:
+      top_k:
+        kmin: 2
+        kmax: 128
+        log: false
+        step: 1
+      methods:
+        - dense
+        - sparse
+        - hybrid
+      hybrid:
+        bm25_weight_min: 0.1
+        bm25_weight_max: 0.9
+        bm25_weight_step: 0.1
+      query_decomposition_enabled:
+        - false
+      query_decomposition:
+        llm_names:
+          - Qwen/Qwen2.5-7B-Instruct
+        num_queries_min: 2
+        num_queries_max: 20
+        num_queries_step: 2
+      fusion:
+        fusion_modes:
+          - simple
+    reranker:
+      llms:
+        - flashrank
+      top_k:
+        kmin: 2
+        kmax: 128
+        log: false
+        step: 1
+  optimization:
+    sampler: lgbo
+    num_random_trials: 1
+  reuse_study: false
+  recreate_study: false
+
+data_root: /home/yingli/Youran/HEART/dataset
+working_dir: /home/yingli/Youran/HEART/agent_workspace/runs
+exp_name: lgbo_qwen_internal_api_1query_5trials

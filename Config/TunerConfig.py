@@ -51,6 +51,18 @@ class TunerConfig(BaseSettings):
         default_factory=SearchSpace,
         description="Search space configuration for the optimization.",
     )
+    cluster_round_sync: bool = Field(
+        default=False,
+        description="Enable round-synchronous cluster-shared LGBO execution.",
+    )
+    cluster_k: int = Field(
+        default=3,
+        description="Number of query clusters for cluster-round LGBO.",
+    )
+    cluster_random_seed: int = Field(
+        default=42,
+        description="Random seed used by query clustering in cluster-round LGBO.",
+    )
     optimization: OptimizationConfig = Field(
         default_factory=OptimizationConfig,
         description="Optimization process configuration.",

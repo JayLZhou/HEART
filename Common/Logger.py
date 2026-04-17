@@ -18,17 +18,33 @@ def define_log_level(print_level="INFO", logfile_level="DEBUG", name: str = None
     formatted_date = current_date.strftime("%Y%m%d%H%M%S")
 
     
+    configured_root = os.getenv("HEART_LOG_ROOT")
+    if configured_root:
+        name = configured_root
+
     if name:
         log_dir = os.path.join(name, "Logs")
-        os.makedirs(log_dir, exist_ok=True)  # make sure the directory exists
-        log_name = os.path.join(log_dir, f"{formatted_date}.log")
     else:
-        log_name = f"Logs/{formatted_date}.log"
+        log_dir = "Logs"
+
+    try:
+        os.makedirs(log_dir, exist_ok=True)
+    except OSError:
+        log_dir = os.path.join(os.getcwd(), "agent_workspace", "bootstrap_logger", "Logs")
+        os.makedirs(log_dir, exist_ok=True)
+
+    log_name = os.path.join(log_dir, f"{formatted_date}.log")
 
 
     _logger.remove()
     _logger.add(sys.stderr, level=print_level)
-    _logger.add(f"{log_name}", level=logfile_level)
+    try:
+        _logger.add(f"{log_name}", level=logfile_level)
+    except OSError:
+        fallback_dir = os.path.join(os.getcwd(), "agent_workspace", "bootstrap_logger", "Logs")
+        os.makedirs(fallback_dir, exist_ok=True)
+        fallback_name = os.path.join(fallback_dir, f"{formatted_date}.log")
+        _logger.add(f"{fallback_name}", level=logfile_level)
     return _logger
 
 

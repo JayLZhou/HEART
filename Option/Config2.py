@@ -37,6 +37,10 @@ class Config(WorkingParams, YamlModel):
     faiss_hnsw_ef_construction: int = 40
     faiss_metric: str = "l2"
     sparse_index_type: str = "bm25"  # bm25
+    faiss_hnsw_m: int = 32
+    faiss_hnsw_ef_search: int = 64
+    faiss_hnsw_ef_construction: int = 40
+    faiss_metric: str = "l2"
     tuner_type: TunerType = TunerType.BO
     token_model: str = "gpt-3.5-turbo"
     
@@ -72,13 +76,12 @@ class Config(WorkingParams, YamlModel):
     @classmethod
     def parse(cls, _path, dataset_name):
         """Parse config from yaml file"""
-        opt = [parse(_path)]
-
         default_config_paths: List[Path] = [
             PROJECT_ROOT / "Option/Config2.yaml",
             CONFIG_ROOT / "Config2.yaml",
         ]
-        opt += [Config.read_yaml(path) for path in default_config_paths]
+        opt = [Config.read_yaml(path) for path in default_config_paths]
+        opt.append(parse(_path))
     
         final = merge_dict(opt)
         final["dataset_name"] = dataset_name

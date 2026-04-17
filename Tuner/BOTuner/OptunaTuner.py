@@ -3,9 +3,11 @@ import typing as T
 import hashlib
 import json
 import traceback
+import threading
 from datetime import datetime, timezone
 from optuna.exceptions import DuplicatedStudyError
 from optuna.study import Study
+from optuna.trial import TrialState
 from Option.Config2 import Config
 from Common.Logger import logger
 from Tuner.BOTuner.HierarchicalTPE import HierarchicalTPESampler
@@ -17,8 +19,13 @@ from Utils.Evaluation import Evaluator
 from Storage.NameSpace import Workspace, Namespace
 from Storage.OptunaStorage import OptunaStorage
 
+_study_admin_lock = threading.Lock()
+
 
 def wrap_params(params: dict):
+    if "rag_retriever" in params and "reranker" in params:
+        return params
+
     out = {}
     rag = {}
     reranker = {}
@@ -113,34 +120,38 @@ class OptunaTuner(BasicBOTuner):
         storage = self.storage.get_storage()
         sampler = self.get_sampler()
         print(query, study_name, storage)
-        if self._share_history_across_queries():
-            try:
-                study = optuna.load_study(
-                    study_name=study_name,
-                    storage=storage,
-                    sampler=sampler,
-                )
-            except KeyError:
+        # Optuna RDB (sqlite + alembic) has admin-path races when many threads
+        # concurrently initialize/delete/create studies on the same storage.
+        # Serialize only study-admin operations; trials remain parallel.
+        with _study_admin_lock:
+            if self._share_history_across_queries():
+                try:
+                    study = optuna.load_study(
+                        study_name=study_name,
+                        storage=storage,
+                        sampler=sampler,
+                    )
+                except KeyError:
+                    study = optuna.create_study(
+                        study_name=study_name,
+                        directions=["maximize"],
+                        sampler=sampler,
+                        storage=storage,
+                    )
+            else:
+                try:
+                    optuna.delete_study(
+                        study_name=study_name,
+                        storage=storage,
+                    )
+                except KeyError:
+                    pass
                 study = optuna.create_study(
                     study_name=study_name,
                     directions=["maximize"],
                     sampler=sampler,
                     storage=storage,
                 )
-        else:
-            try:
-                optuna.delete_study(
-                    study_name=study_name,
-                    storage=storage,
-                )
-            except KeyError:
-                pass
-            study = optuna.create_study(
-                study_name=study_name,
-                directions=["maximize"],
-                sampler=sampler,
-                storage=storage,
-            )
         study.set_user_attr("query", query)
         if self._share_history_across_queries():
             study.set_user_attr("history_scope", "cross_query_shared")
@@ -192,13 +203,16 @@ class OptunaTuner(BasicBOTuner):
         for k, v in params.items():
             trial.set_user_attr(f"suggested:{k}", v)
 
-        try:   
+        objective_name = self.config.tuner.optimization.objective_1_name
+        should_fail_trial = False
+        try:
             # import pdb
             # pdb.set_trace()
             flow = self.builder.build_flow(wrap_params(params))
             response = flow.query(query["question"])
             query["output"] = response
-            metrics = self.evaluator.evaluate_single(query)
+            # Avoid per-trial shared file writes; caller scripts handle run-level summaries.
+            metrics = self.evaluator.evaluate_single(query, persist=False)
 
         except Exception as ex:
             logger.exception("Objective had an unhandled exception: %s", ex)
@@ -208,8 +222,7 @@ class OptunaTuner(BasicBOTuner):
                 "exception_stacktrace": traceback.format_exc(),
                 "exception_class": ex.__class__.__name__,
             }
-            
-            raise ex
+            should_fail_trial = True
         finally:
             self._set_trial(
                 trial=trial,
@@ -217,7 +230,13 @@ class OptunaTuner(BasicBOTuner):
                 flow_json=json.dumps(params),
                 query=query
             )
-        self._tuner.tell(trial, [metrics[self.config.tuner.optimization.objective_1_name]])
+        if should_fail_trial:
+            # Explicitly finalize failed ask() trials; otherwise they remain RUNNING.
+            self._tuner.tell(trial, state=TrialState.FAIL)
+            metrics.setdefault(objective_name, 0.0)
+            return metrics
+
+        self._tuner.tell(trial, [metrics[objective_name]])
         # import pdb
         # pdb.set_trace()
         return metrics
@@ -251,5 +270,3 @@ class OptunaTuner(BasicBOTuner):
         return False
 
  
-
-

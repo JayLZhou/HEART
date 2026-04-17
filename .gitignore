@@ -12,3 +12,9 @@ htmlcov/
 *.json
 *.pkl
 cache/
+api_keys.yaml
+.codex
+.codex/
+agent_workspace/bootstrap_logger/Logs/
+agent_workspace/qwen_local_debug/
+agent_workspace/runs/

@@ -1,6 +1,7 @@
 from Common.Utils import mdhash_id
 from Common.Logger import logger
 import os
+import json
 import faiss
 from typing import Any
 from llama_index.core.schema import (
@@ -29,44 +30,60 @@ class FaissIndex(BaseIndex):
         # self.embedding_model = get_rag_embedding(self.config.embedding.api_type, self.config)
         self.embedding_model = self.config.embed_model
 
-    def _metric_type(self) -> int:
-        metric_name = getattr(self.config, "metric", "l2")
-        if metric_name == "inner_product":
+    def _metric_constant(self):
+        metric = str(getattr(self.config, "metric", "l2")).strip().lower()
+        if metric == "l2":
+            return faiss.METRIC_L2
+        if metric == "inner_product":
             return faiss.METRIC_INNER_PRODUCT
-        return faiss.METRIC_L2
+        raise ValueError(f"Unsupported FAISS metric: {self.config.metric}")
 
-    def _apply_hnsw_runtime_params(self, faiss_index) -> None:
-        hnsw = getattr(faiss_index, "hnsw", None)
-        if hnsw is None:
-            return
-        hnsw.efSearch = int(getattr(self.config, "hnsw_ef_search", 64))
-        hnsw.efConstruction = int(getattr(self.config, "hnsw_ef_construction", 40))
-
-    def _build_faiss_index(self, dimensions: int):
-        faiss_index = faiss.IndexHNSWFlat(
-            dimensions,
+    def _build_faiss_index(self):
+        index = faiss.IndexHNSWFlat(
+            int(self.config.dimensions),
             int(getattr(self.config, "hnsw_m", 32)),
-            self._metric_type(),
+            self._metric_constant(),
         )
-        self._apply_hnsw_runtime_params(faiss_index)
-        return faiss_index
+        index.hnsw.efSearch = int(getattr(self.config, "hnsw_ef_search", 64))
+        index.hnsw.efConstruction = int(getattr(self.config, "hnsw_ef_construction", 40))
+        return index
 
-    def _get_vector_store(self, dimensions: int):
-        return FaissVectorStore(faiss_index=self._build_faiss_index(dimensions))
+    def _metadata_path(self) -> str:
+        return os.path.join(str(self.config.persist_path), "faiss_meta.json")
 
-    def _ensure_runtime_search_params(self) -> None:
-        vector_store = getattr(getattr(self, "_index", None), "vector_store", None)
-        if vector_store is None:
-            storage_context = getattr(self._index, "storage_context", None)
-            vector_store = getattr(storage_context, "vector_store", None)
-        faiss_index = getattr(vector_store, "_faiss_index", None) or getattr(vector_store, "faiss_index", None)
-        if faiss_index is not None:
-            self._apply_hnsw_runtime_params(faiss_index)
+    def _expected_metadata(self) -> dict[str, Any]:
+        return {
+            "dimensions": int(self.config.dimensions),
+            "hnsw_m": int(getattr(self.config, "hnsw_m", 32)),
+            "hnsw_ef_search": int(getattr(self.config, "hnsw_ef_search", 64)),
+            "hnsw_ef_construction": int(getattr(self.config, "hnsw_ef_construction", 40)),
+            "metric": str(getattr(self.config, "metric", "l2")).strip().lower(),
+        }
 
+    def _write_metadata(self):
+        os.makedirs(str(self.config.persist_path), exist_ok=True)
+        with open(self._metadata_path(), "w", encoding="utf-8") as f:
+            json.dump(self._expected_metadata(), f, ensure_ascii=False, indent=2, sort_keys=True)
+
+    def _metadata_matches(self) -> bool:
+        path = self._metadata_path()
+        if not os.path.exists(path):
+            logger.warning("FAISS metadata file missing at %s; index will be rebuilt.", path)
+            return False
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                current = json.load(f)
+        except Exception as e:
+            logger.warning("Failed to read FAISS metadata from %s: %s", path, e)
+            return False
+        expected = self._expected_metadata()
+        if current != expected:
+            logger.warning("FAISS metadata mismatch. expected=%s current=%s", expected, current)
+            return False
+        return True
     def retrieval(self, query, top_k):
         if top_k is None:
             top_k = self._get_retrieve_top_k()
-        self._ensure_runtime_search_params()
         retriever = self._index.as_retriever(similarity_top_k=top_k, embed_model=self.embedding_model)
         query_emb = self._embed_text(query)
         query_bundle = QueryBundle(query_str=query, embedding=query_emb)
@@ -76,7 +93,6 @@ class FaissIndex(BaseIndex):
         return retriever.retrieve(query_bundle)
 
     def get_retriever(self, top_k):
-        self._ensure_runtime_search_params()
         return self._index.as_retriever(similarity_top_k=top_k, embed_model=self.embedding_model)
 
     def retrieval_batch(self, queries, top_k):
@@ -104,7 +120,7 @@ class FaissIndex(BaseIndex):
         # Use batch processing with progress bar
         text_embeddings = self.embedding_model._get_text_embeddings(texts)
 
-        vector_store = self._get_vector_store(self.config.dimensions)
+        vector_store = FaissVectorStore(faiss_index=self._build_faiss_index())
         storage_context = StorageContext.from_defaults(vector_store=vector_store)
 
         self._index =  VectorStoreIndex([], storage_context=storage_context,
@@ -125,12 +141,13 @@ class FaissIndex(BaseIndex):
 
     def _load_index(self) -> bool:
         try:
+            if not self._metadata_matches():
+                return False
             Settings.embed_model = self.embedding_model
 
             vector_store = FaissVectorStore.from_persist_dir(str(self.config.persist_path))
-            faiss_index = getattr(vector_store, "_faiss_index", None) or getattr(vector_store, "faiss_index", None)
-            if faiss_index is not None:
-                self._apply_hnsw_runtime_params(faiss_index)
+            vector_store.client.hnsw.efSearch = int(getattr(self.config, "hnsw_ef_search", 64))
+            vector_store.client.hnsw.efConstruction = int(getattr(self.config, "hnsw_ef_construction", 40))
   
             storage_context = StorageContext.from_defaults(vector_store=vector_store, persist_dir=self.config.persist_path)
      
@@ -152,6 +169,7 @@ class FaissIndex(BaseIndex):
 
     def _storage_index(self):
         self._index.storage_context.persist(persist_dir=self.config.persist_path)
+        self._write_metadata()
 
     def _update_index_from_documents(self, docs: list[Document]):
         refreshed_docs = self._index.refresh_ref_docs(docs)
@@ -161,7 +179,7 @@ class FaissIndex(BaseIndex):
 
     def _get_index(self):
         Settings.embed_model = self.embedding_model
-        vector_store = self._get_vector_store(self.config.dimensions)
+        vector_store = FaissVectorStore(faiss_index=self._build_faiss_index())
         storage_context = StorageContext.from_defaults(vector_store=vector_store)
 
         return  VectorStoreIndex(

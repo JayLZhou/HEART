@@ -56,7 +56,9 @@ def wrapper_tuning():
  
     logger.info("Starting RAG tuning: query level")
     dataset_len = len(dataset)
-    dataset_len = 3
+    record_limit = os.getenv("HEART_RECORD_LIMIT")
+    if record_limit:
+        dataset_len = min(dataset_len, max(0, int(record_limit)))
     for _, idx in enumerate(range(dataset_len)):
         results = []
         query = dataset[idx]
@@ -84,5 +86,4 @@ if __name__ == "__main__":
 
     # Online RAG tuning
     wrapper_tuning()
-
 

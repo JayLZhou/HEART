@@ -37,9 +37,8 @@ data_root: /mnt/data/wangshu/hcarag/ids_data # Root directory for data
 
 working_dir: /mnt/data/yingli/RAGTuner/ # Result directory for the experiment
 exp_name: tpebo # Experiment name
-vdb_type: faiss
 faiss_hnsw_m: 32
 faiss_hnsw_ef_search: 64
 faiss_hnsw_ef_construction: 40
-faiss_metric: l2
+faiss_metric: "l2"
 # 

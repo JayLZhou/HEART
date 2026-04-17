@@ -22,6 +22,9 @@ class LGBOObservation:
     flow: Dict[str, Any] | None
     query: Dict[str, Any] | None
     reasoning: str | None
+    round_id: int | None = None
+    cluster_id: int | None = None
+    query_id: str | None = None
 
 
 class LGBOHistoryAdapter:
@@ -51,6 +54,9 @@ class LGBOHistoryAdapter:
                     flow=flow,
                     query=user_attrs.get("query"),
                     reasoning=user_attrs.get("lgbo_reasoning"),
+                    round_id=user_attrs.get("round_id"),
+                    cluster_id=user_attrs.get("cluster_id"),
+                    query_id=str(user_attrs.get("query_id")) if user_attrs.get("query_id") is not None else None,
                 )
             )
         return observations
@@ -100,13 +106,14 @@ class LGBOHistoryAdapter:
         observations: Sequence[LGBOObservation],
         *,
         higher_is_better: bool = True,
-        max_items: int = 6,
+        max_items: int | None = 6,
     ) -> List[str]:
         if not observations:
             return []
 
         ordered = list(observations)
-        ordered = ordered[-max_items:]
+        if max_items is not None:
+            ordered = ordered[-max_items:]
         if not higher_is_better:
             best = min(obs.objective for obs in observations)
         else:
@@ -120,8 +127,45 @@ class LGBOHistoryAdapter:
             query_key = self._query_key(obs.query)
             if query_key is not None:
                 query_tag = f"; query_id={query_key}"
-            lines.append(f"recent_{idx}: objective={obs.objective}; params=({params}){query_tag}{mark}")
+            cluster_tag = f"; cluster_id={obs.cluster_id}" if obs.cluster_id is not None else ""
+            round_tag = f"; round_id={obs.round_id}" if obs.round_id is not None else ""
+            lines.append(
+                f"recent_{idx}: objective={obs.objective}; params=({params})"
+                f"{query_tag}{cluster_tag}{round_tag}{mark}"
+            )
         return lines
+
+    def build_lgbo_history_entries(
+        self,
+        observations: Sequence[LGBOObservation],
+        *,
+        max_items: int | None = None,
+        objective_name: str = "objective",
+    ) -> List[str]:
+        """Build history entries compatible with lgbo/prompt.py style.
+
+        Format example:
+          (p1=v1, p2=v2) -> objective=0.82; query_id=12; cluster_id=3; round_id=2
+        """
+        if not observations:
+            return []
+        ordered = list(observations)
+        if max_items is not None:
+            ordered = ordered[-max_items:]
+
+        entries: List[str] = []
+        for obs in reversed(ordered):
+            params = ", ".join(f"{name}={value}" for name, value in obs.params.items())
+            suffix = []
+            if obs.query_id is not None:
+                suffix.append(f"query_id={obs.query_id}")
+            if obs.cluster_id is not None:
+                suffix.append(f"cluster_id={obs.cluster_id}")
+            if obs.round_id is not None:
+                suffix.append(f"round_id={obs.round_id}")
+            meta = f"; {'; '.join(suffix)}" if suffix else ""
+            entries.append(f"({params}) -> {objective_name}={obs.objective}{meta}")
+        return entries
 
     def _extract_objective(self, trial: Any) -> float:
         values = getattr(trial, "values", None)
@@ -189,4 +233,3 @@ class LGBOHistoryAdapter:
             for name in param_names
             if f"{suggested_prefix}{name}" in user_attrs
         }
-
