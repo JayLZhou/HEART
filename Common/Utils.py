@@ -181,7 +181,26 @@ def extract_answer(response: str) -> str:
     """
     Extract the answer from the response.
     """
-    if "Answer:" in response:
-        return response.split("Answer: ")[1].strip()
-    else:
-        return response
+    if not isinstance(response, str):
+        return str(response)
+
+    text = response.strip()
+    if not text:
+        return text
+
+    # Prefer explicit answer markers, but tolerate formatting drift such as
+    # `Answer:foo`, `answer : foo`, or markdown emphasis around the label.
+    explicit_matches = re.findall(r"(?im)(?:^|\n)\s*\**answer\**\s*:\s*(.+)", text)
+    if explicit_matches:
+        return explicit_matches[-1].strip()
+
+    inline_matches = re.findall(r"(?i)\banswer\s*:\s*(.+)", text)
+    if inline_matches:
+        return inline_matches[-1].strip()
+
+    # Fall back to the last non-empty line when the model omits the label.
+    lines = [line.strip(" -*\t") for line in text.splitlines() if line.strip()]
+    if lines:
+        return lines[-1].strip()
+
+    return text

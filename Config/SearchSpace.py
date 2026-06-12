@@ -1,6 +1,7 @@
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
 import typing as T
 from Common.Constants import TEMPLATE_NAMES, DEFAULT_LLMS
+from Config.FaissConfig import FaissSearchSpace
 from Config.RetrieverConfig import Retriever
 from Config.TopKConfig import TopK
 from Config.RerankConfig import Reranker
@@ -43,16 +44,22 @@ class SearchSpace(BaseModel):
     reranker: Reranker = Field(
         default_factory=Reranker, description="Configuration for the reranker."
     )
+    faiss: FaissSearchSpace = Field(
+        default_factory=FaissSearchSpace,
+        description="Search-space configuration for FAISS HNSW parameters.",
+    )
 
-
-
+    _custom_defaults: dict[str, T.Any] = PrivateAttr(default_factory=dict)
 
     def _defaults(self) -> ParamDict:
-        return {
+        base: ParamDict = {
             "template_name": self.template_names[0],
             "response_synthesizer_llm": self.response_synthesizer_llms[0],
             **self.rag_retriever.defaults(),
+            **self.faiss.defaults(),
         }
+        merged = {**base, **self._custom_defaults}
+        return T.cast(ParamDict, merged)
 
     def update_defaults(self, defaults: ParamDict) -> None:
         self._custom_defaults.update(defaults)
@@ -66,6 +73,11 @@ class SearchSpace(BaseModel):
     def build_distributions(
         self, params: T.Dict[str, T.Any] | T.List[str] | None = None
     ) -> T.Dict[str, BaseDistribution]:
+        # None => full introspection (e.g. param_names()): include optional FAISS + reranker blocks.
+        if params is None:
+            param_names = {"faiss", "reranker"}
+        else:
+            param_names = set(params)
         distributions: dict[str, BaseDistribution] = {
             "template_name": CategoricalDistribution(self.template_names),
             "response_synthesizer_llm": CategoricalDistribution(
@@ -75,7 +87,9 @@ class SearchSpace(BaseModel):
         }
 
         distributions.update(self.rag_retriever.build_distributions())
-        if "reranker" in params:
+        if "faiss" in param_names:
+            distributions.update(self.faiss.build_distributions())
+        if "reranker" in param_names:
             distributions['reranker'] = self.reranker.build_distributions()
       
 
@@ -108,11 +122,16 @@ class SearchSpace(BaseModel):
             params["response_synthesizer_llm"] = self._default_params["response_synthesizer_llm"]
 
         params['rag_retriever'] = self.rag_retriever.sample(trial)
-       
+        if "faiss" in parameters:
+            params.update(self.faiss.sample(trial))
+        else:
+            params.update(self.faiss.defaults())
+        
         if "reranker" in parameters:
                 params['reranker'] = self.reranker.sample(trial)
                 params['reranker']["reranker_enabled"] = True
         else:
+            params['reranker'] = self.reranker.defaults()
             params['reranker']["reranker_enabled"] = False
 
 
@@ -170,6 +189,7 @@ class SearchSpace(BaseModel):
         )
     
         sub_card *= self.rag_retriever.get_cardinality()
+        sub_card *= self.faiss.get_cardinality()
 
         card += sub_card
 

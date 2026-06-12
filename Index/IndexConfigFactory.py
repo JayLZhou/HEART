@@ -38,7 +38,11 @@ class IndexConfigFactory:
         return FAISSIndexConfig(
             persist_path=persist_path,
             embed_model=get_rag_embedding(config.embedding.api_type, config),
-            dimensions=config.embedding.dimensions
+            dimensions=config.embedding.dimensions,
+            hnsw_m=config.faiss_hnsw_m,
+            hnsw_ef_search=config.faiss_hnsw_ef_search,
+            hnsw_ef_construction=config.faiss_hnsw_ef_construction,
+            metric=config.faiss_metric,
         )
 
     @staticmethod

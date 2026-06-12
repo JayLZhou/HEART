@@ -1,4 +1,5 @@
 from Rerank.Upr import UPR
+from Rerank.QwenReranker import QwenReranker
 from Rerank.ColbertRanker import ColBERTReranker
 from Rerank.Flashrank import FlashRanker
 from Rerank.Monot5 import MonoT5
@@ -16,6 +17,7 @@ from Schema.DocumentSchema import Document
 from Common.Logger import logger
 METHOD_MAP = {
     # Existing reranking methods
+    'qwen_reranker': QwenReranker,
     'upr': UPR,
     'flashrank': FlashRanker,
     'monot5': MonoT5,

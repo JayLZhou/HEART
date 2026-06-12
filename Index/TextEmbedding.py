@@ -1,6 +1,5 @@
 from modelscope import AutoTokenizer, AutoModel
 import openai
-import ollama
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -60,9 +59,12 @@ class TextEmbedding(BaseEmbedding):
             logger.info("Local model loaded successfully.")
 
         elif self.backend == "ollama":
+            import ollama
+
+            object.__setattr__(self, "_ollama", ollama)
             object.__setattr__(self, "device", "ollama_service")
         elif self.backend == "openai":
-            object.__setattr__(self, "client", openai.OpenAI(api_key="empty", base_url=api_base))
+            object.__setattr__(self, "client", openai.OpenAI(api_key="empty", base_url=api_base, timeout=60.0))
         else:
             raise ValueError(
                 f"Unsupported backend: '{self.backend}'. Choose 'local', 'ollama', or 'openai'."
@@ -152,7 +154,7 @@ class TextEmbedding(BaseEmbedding):
         elif self.backend == "ollama":
             all_embeddings = []
             for text in texts:
-                response = ollama.embeddings(model=self.model_name, prompt=text)
+                response = self._ollama.embeddings(model=self.model_name, prompt=text)
                 all_embeddings.append(response["embedding"])
             embeddings_np = np.array(all_embeddings, dtype=np.float32)
             embeddings_tensor = torch.from_numpy(embeddings_np).to("cpu")
@@ -198,6 +200,5 @@ class TextEmbedding(BaseEmbedding):
                 torch.cuda.empty_cache()
             gc.collect()
             logger.info("Embedding model resources released.")
-
 
 

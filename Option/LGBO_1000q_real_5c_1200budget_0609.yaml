@@ -1,0 +1,83 @@
+llms:
+  - api_type: "openai"
+    base_url: "http://localhost:8001/v1"
+    model: "qwen2.5-7b"
+    api_key: "sk-local"
+
+embedding:
+  api_type: "openai"
+  base_url: "http://localhost:8017/v1"
+  api_key: "sk-local"
+  model: "Qwen3-Embedding-0.6B"
+  dimensions: 1024
+  embed_batch_size: 64
+
+llm_model_max_token_size: 8192
+index_name: tree_graph_balanced
+force_rebuild: true
+vdb_type: faiss
+sparse_index_type: bm25
+tuner_type: bo
+num_trials: 20
+
+chunk:
+  chunk_token_size: 400
+  chunk_overlap_token_size: 40
+  token_model: gpt-3.5-turbo
+  chunk_method: chunking_by_token_size
+
+retriever:
+  top_k:
+    kmin: 2
+    kmax: 32
+    log: false
+    step: 1
+  methods:
+    - dense
+    - sparse
+    - hybrid
+  hybrid:
+    bm25_weight_min: 0.2
+    bm25_weight_max: 0.8
+    bm25_weight_step: 0.2
+  query_decomposition_enabled:
+    - false
+  query_decomposition:
+    llm_names:
+      - qwen2.5-7b
+    num_queries_min: 2
+    num_queries_max: 8
+    num_queries_step: 2
+  fusion:
+    fusion_modes:
+      - simple
+      - reciprocal_rerank
+
+tuner:
+  name: lgbo_1000q_real_5c_1200budget_0609
+  reuse_study: false
+  recreate_study: true
+  optimization:
+    sampler: lgbo
+    num_random_trials: 2
+    budget_per_round: 120
+    budget_rounds: 10
+    budget_n_min: 20
+    budget_tau: 1.0
+    budget_ema_alpha: 0.9
+    budget_gamma: 0.2
+    warm_start_synergy_threshold: 0.6
+    cold_start_equal_rounds: 1
+    cluster_kmeans_enabled: true
+    cluster_kmeans_k: 5
+    cluster_kmeans_random_state: 42
+    run_full_eval_before_after: true
+    eval_parallel_workers: 16
+  search_space:
+    reranker:
+      choices:
+        - "flashrank::ms-marco-TinyBERT-L-2-v2"
+
+data_root: /data1/yujia/HEART/HEART/agent_workspace/datasets
+working_dir: /data1/yujia/HEART/HEART/agent_workspace/runs
+exp_name: lgbo_1000q_real_5c_1200budget_0609

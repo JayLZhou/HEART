@@ -28,9 +28,45 @@ class FaissIndex(BaseIndex):
         print(config)
         # self.embedding_model = get_rag_embedding(self.config.embedding.api_type, self.config)
         self.embedding_model = self.config.embed_model
+
+    def _metric_type(self) -> int:
+        metric_name = getattr(self.config, "metric", "l2")
+        if metric_name == "inner_product":
+            return faiss.METRIC_INNER_PRODUCT
+        return faiss.METRIC_L2
+
+    def _apply_hnsw_runtime_params(self, faiss_index) -> None:
+        hnsw = getattr(faiss_index, "hnsw", None)
+        if hnsw is None:
+            return
+        hnsw.efSearch = int(getattr(self.config, "hnsw_ef_search", 64))
+        hnsw.efConstruction = int(getattr(self.config, "hnsw_ef_construction", 40))
+
+    def _build_faiss_index(self, dimensions: int):
+        faiss_index = faiss.IndexHNSWFlat(
+            dimensions,
+            int(getattr(self.config, "hnsw_m", 32)),
+            self._metric_type(),
+        )
+        self._apply_hnsw_runtime_params(faiss_index)
+        return faiss_index
+
+    def _get_vector_store(self, dimensions: int):
+        return FaissVectorStore(faiss_index=self._build_faiss_index(dimensions))
+
+    def _ensure_runtime_search_params(self) -> None:
+        vector_store = getattr(getattr(self, "_index", None), "vector_store", None)
+        if vector_store is None:
+            storage_context = getattr(self._index, "storage_context", None)
+            vector_store = getattr(storage_context, "vector_store", None)
+        faiss_index = getattr(vector_store, "_faiss_index", None) or getattr(vector_store, "faiss_index", None)
+        if faiss_index is not None:
+            self._apply_hnsw_runtime_params(faiss_index)
+
     def retrieval(self, query, top_k):
         if top_k is None:
             top_k = self._get_retrieve_top_k()
+        self._ensure_runtime_search_params()
         retriever = self._index.as_retriever(similarity_top_k=top_k, embed_model=self.embedding_model)
         query_emb = self._embed_text(query)
         query_bundle = QueryBundle(query_str=query, embedding=query_emb)
@@ -40,6 +76,7 @@ class FaissIndex(BaseIndex):
         return retriever.retrieve(query_bundle)
 
     def get_retriever(self, top_k):
+        self._ensure_runtime_search_params()
         return self._index.as_retriever(similarity_top_k=top_k, embed_model=self.embedding_model)
 
     def retrieval_batch(self, queries, top_k):
@@ -64,13 +101,14 @@ class FaissIndex(BaseIndex):
         # Generate embeddings with progress bar
         logger.info(f"Generating embeddings for {len(texts)} texts...")
         
-        # Use batch processing with progress bar
-        text_embeddings = self.embedding_model._get_text_embeddings(texts)
+        # Batch embedding requests to satisfy provider-side per-request limits.
+        batch_size = int(getattr(self.config, "embed_batch_size", 64) or 64)
+        text_embeddings = []
+        for i in range(0, len(texts), batch_size):
+            batch = texts[i : i + batch_size]
+            text_embeddings.extend(self.embedding_model._get_text_embeddings(batch))
 
-        # 32 is the default value of hnsw index
-        # import pdb
-        # pdb.set_trace()
-        vector_store = FaissVectorStore(faiss_index=faiss.IndexHNSWFlat(self.config.dimensions, 32))
+        vector_store = self._get_vector_store(self.config.dimensions)
         storage_context = StorageContext.from_defaults(vector_store=vector_store)
 
         self._index =  VectorStoreIndex([], storage_context=storage_context,
@@ -94,6 +132,9 @@ class FaissIndex(BaseIndex):
             Settings.embed_model = self.embedding_model
 
             vector_store = FaissVectorStore.from_persist_dir(str(self.config.persist_path))
+            faiss_index = getattr(vector_store, "_faiss_index", None) or getattr(vector_store, "faiss_index", None)
+            if faiss_index is not None:
+                self._apply_hnsw_runtime_params(faiss_index)
   
             storage_context = StorageContext.from_defaults(vector_store=vector_store, persist_dir=self.config.persist_path)
      
@@ -124,8 +165,7 @@ class FaissIndex(BaseIndex):
 
     def _get_index(self):
         Settings.embed_model = self.embedding_model
-        #TODO: config the faiss index config
-        vector_store = FaissVectorStore(faiss_index=faiss.IndexHNSWFlat(1024, 32))
+        vector_store = self._get_vector_store(self.config.dimensions)
         storage_context = StorageContext.from_defaults(vector_store=vector_store)
 
         return  VectorStoreIndex(

@@ -161,7 +161,7 @@ class FlashRanker(BaseRanking):
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
         local_zip_file = self.cache_dir / f"{model_name}.zip"
-        model_url = "https://huggingface.co/prithivida/flashrank/resolve/main/{}.zip"
+        model_url = "https://hf-mirror.com/prithivida/flashrank/resolve/main/{}.zip"
         formatted_model_url = model_url.format(model_name)
         
         with requests.get(formatted_model_url, stream=True) as r:

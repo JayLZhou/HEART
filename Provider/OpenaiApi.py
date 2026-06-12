@@ -55,7 +55,7 @@ class OpenAILLM(BaseLLM):
         self.aclient = AsyncOpenAI(**kwargs)
 
     def _make_client_kwargs(self) -> dict:
-        kwargs = {"api_key": self.config.api_key, "base_url": self.config.base_url}
+        kwargs = {"api_key": self.config.api_key, "base_url": self.config.base_url, "timeout": 60.0}
 
         # to use proxy, openai v1 needs http_client
         if proxy_params := self._get_proxy_params():
@@ -79,7 +79,15 @@ class OpenAILLM(BaseLLM):
         usage = None
         collected_messages = []
         has_finished = False
-        async for chunk in response:
+        _stream_iter = response.__aiter__()
+        while True:
+            try:
+                chunk = await asyncio.wait_for(_stream_iter.__anext__(), timeout=60.0)
+            except asyncio.TimeoutError:
+                logger.warning("[HEART] Streaming chunk timeout after 60s; returning partial response")
+                break
+            except StopAsyncIteration:
+                break
             chunk_message = chunk.choices[0].delta.content or "" if chunk.choices else ""  # extract the message
             finish_reason = (
                 chunk.choices[0].finish_reason if chunk.choices and hasattr(chunk.choices[0], "finish_reason") else None
@@ -143,8 +151,8 @@ class OpenAILLM(BaseLLM):
         return await self._achat_completion(messages, timeout=self.get_timeout(timeout))
 
     @retry(
-        wait=wait_random_exponential(min=1, max=60),
-        stop=stop_after_attempt(6),
+        wait=wait_random_exponential(min=1, max=10),
+        stop=stop_after_attempt(2),
         after=after_log(logger, logger.level("WARNING").name),
         retry=retry_if_exception_type(Exception),
         retry_error_callback=log_and_reraise,

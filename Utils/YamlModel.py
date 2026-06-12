@@ -1,8 +1,13 @@
 from pathlib import Path
 from typing import Dict, Optional
+import os
+import re
 
 import yaml
 from pydantic import BaseModel, model_validator
+
+
+ENV_VAR_PATTERN = re.compile(r"^\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-(.*))?\}$")
 
 
 class YamlModel(BaseModel):
@@ -16,7 +21,27 @@ class YamlModel(BaseModel):
         if not file_path.exists():
             return {}
         with open(file_path, "r", encoding=encoding) as file:
-            return yaml.safe_load(file)
+            data = yaml.safe_load(file) or {}
+        return cls.resolve_env_vars(data)
+
+    @classmethod
+    def resolve_env_vars(cls, value):
+        """Resolve ${ENV_VAR} and ${ENV_VAR:-default} values recursively."""
+        if isinstance(value, dict):
+            return {k: cls.resolve_env_vars(v) for k, v in value.items()}
+        if isinstance(value, list):
+            return [cls.resolve_env_vars(item) for item in value]
+        if isinstance(value, str):
+            match = ENV_VAR_PATTERN.match(value)
+            if not match:
+                return value
+
+            env_key, default = match.groups()
+            env_value = os.getenv(env_key, default)
+            if env_value is None:
+                raise ValueError(f"Environment variable '{env_key}' is not set")
+            return env_value
+        return value
 
    
 class YamlModelWithoutDefault(YamlModel):

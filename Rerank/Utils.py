@@ -1,6 +1,7 @@
 from typing import Union, List, Optional, Tuple
 import torch
 MODEL_NAME_DEFAULTS = {
+    'qwen_reranker': 'qwen3-reranker-0.6b',
     'flashrank': 'ms-marco-MiniLM-L-12-v2',
     'transformer_ranker': 'mxbai-rerank-xsmall', 
     'colbert_ranker': 'Colbert',
@@ -15,6 +16,11 @@ MODEL_NAME_DEFAULTS = {
 }
 # https://github.com/DataScienceUIBK/Rankify/blob/main/rankify/utils/pre_defind_models.py
 HF_PRE_DEFIND_MODELS ={
+    'qwen_reranker':{
+        'qwen3-reranker-0.6b': 'Qwen/Qwen3-Reranker-0.6B',
+        'qwen3-reranker-4b': 'Qwen/Qwen3-Reranker-4B',
+        'qwen3-reranker-8b': 'Qwen/Qwen3-Reranker-8B',
+    },
     'upr':{
         't5-small':'google/t5-small-lm-adapt',
         't5-base':'google/t5-base-lm-adapt',
@@ -108,10 +114,13 @@ HF_PRE_DEFIND_MODELS ={
         "bge-reranker-base":"BAAI/bge-reranker-base",
         "bge-reranker-large":"BAAI/bge-reranker-large",
         "bge-reranker-v2-m3": "BAAI/bge-reranker-v2-m3",
+        "bge-reranker-v2-gemma":"BAAI/bge-reranker-v2-gemma",
+        "bge-reranker-v2-minicpm-layerwise":"BAAI/bge-reranker-v2-minicpm-layerwise",
         "bce-reranker-base" :"maidalun1020/bce-reranker-base_v1",
         "jina-reranker-tiny":'jinaai/jina-reranker-v1-tiny-en',
         "jina-reranker-turbo":"jinaai/jina-reranker-v1-turbo-en",
         "jina-reranker-base-multilingual":"jinaai/jina-reranker-v2-base-multilingual",
+        "jina-reranker-m0":"jinaai/jina-reranker-m0",
         "gte-multilingual-reranker-base":"Alibaba-NLP/gte-multilingual-reranker-base",
         "camembert-base-mmarcoFR":"antoinelouis/crossencoder-camembert-base-mmarcoFR",
         "camembert-large-mmarcoFR":"antoinelouis/crossencoder-camembert-large-mmarcoFR",
@@ -255,6 +264,8 @@ def get_device(
                 device = "mps"
             else:
                 device = "cpu"
+        elif isinstance(device, str) and device.startswith("cuda") and not torch.cuda.is_available():
+            device = "cpu"
         return device
 
 def get_dtype(
