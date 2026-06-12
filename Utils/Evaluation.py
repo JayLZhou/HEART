@@ -178,18 +178,18 @@ class Evaluator:
             self.mode = "long-narrative"
         else:
             self.mode = self.dataset_mode_map.get(dataset_name, "short-form")
-    def evaluate_single(self, query: dict, persist: bool = True):
+    def evaluate_single(self, query: dict):
         df = pd.DataFrame([query])
         print(f"Evaluating single record in {self.mode} mode.")
-        return self._evaluate(df, persist=persist)
+        return self._evaluate(df)
 
     def evaluate(self):
         df = pd.read_json(self.path, lines=True)
         print(f"Loaded {len(df)} records from {self.path}")
         print(f"Evaluating {self.mode} mode.")
-        return self._evaluate(df, persist=True)
+        return self._evaluate(df)
       
-    def _evaluate(self, df: pd.DataFrame, persist: bool = True):
+    def _evaluate(self, df: pd.DataFrame):
         if self.mode == "short-form":
             self.print_eval_matrics(self.short_eval_metrics)
             res_dict, df = self.short_eval(df)
@@ -210,9 +210,8 @@ class Evaluator:
             raise ValueError("Invalid evaluation mode.")
 
         # add .score to the save path, before the .json
-        if persist:
-            save_path = self.path.replace(".json", ".score.json")
-            df.to_json(save_path, orient="records", lines=True)
+        save_path = self.path.replace(".json", ".score.json")
+        df.to_json(save_path, orient="records", lines=True)
         return res_dict
     def print_eval_matrics(self, eval_matrics):
         print("In this evaluation, the following metrics are used:")

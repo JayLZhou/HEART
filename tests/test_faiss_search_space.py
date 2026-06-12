@@ -48,6 +48,13 @@ class FaissSearchSpaceTests(unittest.TestCase):
         self.assertEqual(defaults["faiss_hnsw_ef_construction"], 40)
         self.assertEqual(defaults["faiss_metric"], "l2")
 
+    def test_build_distributions_none_includes_faiss_and_reranker_blocks(self):
+        search_space = SearchSpace()
+        dists = search_space.build_distributions(None)
+        self.assertIn("faiss_hnsw_m", dists)
+        self.assertIn("reranker", dists)
+        self.assertIsInstance(dists["reranker"], dict)
+
 
 if __name__ == "__main__":
     unittest.main()

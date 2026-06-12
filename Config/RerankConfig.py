@@ -3,15 +3,8 @@ from Config.TopKConfig import TopK
 import typing as T
 from Config.SearchSpaceMix import *
 class Reranker(BaseModel, SearchSpaceMixin):
-    """
-    Params:
-        reranker_llm_name
-        reranker_top_k
-    """
-
     top_k: TopK = Field(
         default_factory=lambda: TopK(kmax=128, log=True),
-        description="Configuration for the number of items to rerank.",
     )
     choices: T.List[str] = Field(
         default_factory=lambda: [
@@ -20,13 +13,10 @@ class Reranker(BaseModel, SearchSpaceMixin):
             "qwen_reranker::qwen3-reranker-0.6b",
             "transformer_ranker::mxbai-rerank-base",
             "transformer_ranker::bge-reranker-v2-m3",
-            "transformer_ranker::bge-reranker-v2-gemma",
-            "transformer_ranker::jina-reranker-m0",
             "transformer_ranker::jina-reranker-base-multilingual",
             "transformer_ranker::gte-multilingual-reranker-base",
             "upr::t5-base",
         ],
-        description="Single categorical reranker choices in the form method::model_alias.",
     )
 
     def defaults(self, prefix: str = "") -> T.Dict[str, T.Any]:

@@ -34,7 +34,14 @@ class TunerConfig(BaseSettings):
         default="default", description="Name of the tuner."
     )
     tuner_params: T.List[str] = Field(
-        default_factory=lambda: ["template_name", "response_synthesizer_llm", "reranker", "rag_retriever", "reranker", "faiss", "sub_question"],
+        default_factory=lambda: [
+            "template_name",
+            "response_synthesizer_llm",
+            "reranker",
+            "rag_retriever",
+            "reranker",
+            "faiss",
+        ],
         description="Parameters to tune."
     )
     evaluation: Evaluation = Field(
@@ -50,18 +57,6 @@ class TunerConfig(BaseSettings):
     search_space: SearchSpace = Field(
         default_factory=SearchSpace,
         description="Search space configuration for the optimization.",
-    )
-    cluster_round_sync: bool = Field(
-        default=False,
-        description="Enable round-synchronous cluster-shared LGBO execution.",
-    )
-    cluster_k: int = Field(
-        default=3,
-        description="Number of query clusters for cluster-round LGBO.",
-    )
-    cluster_random_seed: int = Field(
-        default=42,
-        description="Random seed used by query clustering in cluster-round LGBO.",
     )
     optimization: OptimizationConfig = Field(
         default_factory=OptimizationConfig,

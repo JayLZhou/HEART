@@ -80,7 +80,7 @@ class UPR(BaseRanking):
         self.model =  None
         self.tokenizer = None
         self.use_bf16 = kwargs.get("use_bf16", True) 
-        self.use_gpu = kwargs.get("use_gpu", True)  
+        self.use_gpu = kwargs.get("use_gpu", True) and torch.cuda.is_available()  
         self.batch_size= kwargs.get("batch_size", 1)  
         self.shard_size = kwargs.get("shard_size", 128)   
         self.include_eos_token = kwargs.get("include_eos_token", True)    
@@ -159,7 +159,7 @@ class UPR(BaseRanking):
                                         return_tensors='pt')
         context_tensor, attention_mask = input_encoding.input_ids, input_encoding.attention_mask
 
-        if use_gpu:
+        if use_gpu and torch.cuda.is_available():
             context_tensor = context_tensor.cuda()
             attention_mask= attention_mask.cuda()
         
@@ -172,7 +172,7 @@ class UPR(BaseRanking):
         
         decoder_prefix_tensor = target_encoding.input_ids
 
-        if use_gpu:
+        if use_gpu and torch.cuda.is_available():
             decoder_prefix_tensor = decoder_prefix_tensor.cuda()
         
         decoder_prefix_tensor = torch.repeat_interleave(decoder_prefix_tensor,
@@ -280,7 +280,7 @@ class UPR(BaseRanking):
         padded_ids = torch.LongTensor(padded_ids)
 
 
-        if use_gpu:
+        if use_gpu and torch.cuda.is_available():
             context_tensor = padded_ids.cuda()
             padded_labels = padded_labels.cuda()
         else:

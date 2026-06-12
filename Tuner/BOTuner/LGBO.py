@@ -1,33 +1,46 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Dict, Sequence
+from typing import Any, Dict
 
 from optuna.distributions import BaseDistribution
 from optuna.study import Study
 from optuna.trial import FrozenTrial
 
 from Option.Config2 import Config
-from Prompt.LGBOPrompt import LGBO_SYSTEM_PROMPT, build_lgbo_prompt
+from Prompt.LGBOPrompt import LGBO_NUMERIC_SYSTEM_PROMPT, build_lgbo_numeric_prompt
 from Provider.LLMProviderRegister import create_llm_instance
 from Tuner.BOTuner.lgbo_components.candidate import LGBOCandidateGenerator
 from Tuner.BOTuner.lgbo_components.history import LGBOHistoryAdapter
 from Tuner.BOTuner.lgbo_components.preference import LGBOPreferenceParser, LGBOPreferencePlanner
-from Tuner.BOTuner.lgbo_components.search_space import MixedSearchSpaceAdapter, ParamSpec
+from Tuner.BOTuner.lgbo_components.search_space import (
+    CategoricalSearchSpaceAdapter,
+    NumericSearchSpaceAdapter,
+)
 from Tuner.BOTuner.lgbo_components.trace_store import LGBOTraceStore
+from Tuner.BOTuner.lgbo_components.unified_surrogate import build_surrogate_layers
 
 
 class LGBOSampler:
-    """Mixed-space LGBO sampler for HEART."""
+    """HEART **Tuner LGBO** — lives in ``Tuner/BOTuner/`` (this file + ``lgbo_components/``).
 
-    MAX_TOTAL_REQUEST_CONCURRENCY = 28
-    MAX_KEY_ATTEMPTS_PER_REQUEST = 3
+    This is the sampler selected by ``optimization.sampler == "lgbo"``. It is not
+    the standalone reference package under the repo-root ``lgbo/`` folder; that
+    tree is optional reference code (e.g. ``lgbo.decide`` may be imported for
+    planning).
 
-    def __init__(self, config: Config):
+    All tunable dimensions share one normalized surrogate in ``[0,1]^d``
+    (:mod:`Tuner.BOTuner.lgbo_components.unified_surrogate`). Proposals use
+    :class:`Tuner.BOTuner.lgbo_components.surrogate.LGBONumericBayesGenerator`.
+    """
+
+    def __init__(self, config: Config, use_llm_guidance: bool = True):
         self.config = config
+        self.use_llm_guidance = use_llm_guidance
         self.search_space = config.tuner.search_space
         self.history = LGBOHistoryAdapter()
-        self.space = MixedSearchSpaceAdapter()
+        self.numeric_space = NumericSearchSpaceAdapter()
+        self.categorical_space = CategoricalSearchSpaceAdapter()
         self.preference_parser = LGBOPreferenceParser()
         self.preference_planner = LGBOPreferencePlanner()
         self.trace_store = LGBOTraceStore()
@@ -48,45 +61,125 @@ class LGBOSampler:
         return flatten_dict(search_space)
 
     def sample_relative(self, study: Study, trial: FrozenTrial, search_space: Dict[str, BaseDistribution]) -> Dict[str, Any]:
-        result = self.sample_relative_batch(
-            study=study,
-            trial_contexts=[
-                {
-                    "trial": trial,
-                    "query": (getattr(study, "user_attrs", {}) or {}).get("query"),
-                }
-            ],
-            search_space=search_space,
+        numeric_search_space = self.numeric_space.filter_numeric_distributions(search_space)
+        numeric_specs = self.numeric_space.build_specs(numeric_search_space)
+        categorical_search_space = self.categorical_space.filter_categorical_distributions(
+            search_space,
+            exclude_names=set(),
         )
-        return result[0]
+        categorical_specs = self.categorical_space.build_specs(categorical_search_space)
+        surrogate_specs, metas = build_surrogate_layers(numeric_specs, categorical_specs)
+        if not surrogate_specs:
+            return self.search_space.sample_from_distributions(dists=search_space)
 
-    def sample_relative_batch(
-        self,
-        *,
-        study: Study,
-        trial_contexts: Sequence[Dict[str, Any]],
-        search_space: Dict[str, BaseDistribution],
-    ) -> list[Dict[str, Any]]:
-        supported_search_space = self.space.filter_supported_distributions(search_space)
-        specs = self.space.build_specs(supported_search_space)
-        if not specs:
-            return [self.search_space.sample_from_distributions(dists=search_space) for _ in trial_contexts]
+        completed_trials = self.history.completed_trials(study)
+        budget_ctx = (getattr(study, "user_attrs", {}) or {}).get("lgbo_budget_context", {}) or {}
+        current_cluster_id = budget_ctx.get("cluster_id")
+        gamma = float(budget_ctx.get("gamma", 0.0))
+        utility = float(budget_ctx.get("utility", 0.0))
+        warm_start = budget_ctx.get("warm_start_candidate")
 
-        llm_inputs = [self._prepare_trial_input(study, ctx, specs) for ctx in trial_contexts]
-        raw_responses = self._call_llm_batch([item["prompt"] for item in llm_inputs])
+        def _trial_in_cluster(t: Any) -> bool:
+            if current_cluster_id is None:
+                return True
+            q = (getattr(t, "user_attrs", {}) or {}).get("query") or {}
+            return str(q.get("__cluster_id")) == str(current_cluster_id)
 
-        results: list[Dict[str, Any]] = []
-        for ctx, prepared, raw_response in zip(trial_contexts, llm_inputs, raw_responses):
-            results.append(
-                self._finalize_candidate(
-                    trial=ctx["trial"],
-                    raw_response=raw_response,
-                    prepared=prepared,
-                    search_space=search_space,
-                    specs=specs,
+        selected_param_names = [spec.name for spec in numeric_specs] + [spec.name for spec in categorical_specs]
+        observations = self.history.observations_from_trials(
+            completed_trials,
+            param_names=selected_param_names,
+            trial_filter=_trial_in_cluster,
+        )
+        observed_configs = self.history.observed_configs(observations)
+        objective_name = getattr(self.config.tuner.optimization, "objective_1_name", "objective")
+        higher_is_better = True
+        history_lines = self.history.build_history_lines(
+            observations,
+            higher_is_better=higher_is_better,
+        )
+        query_text = self.history.latest_query_text(study, completed_trials)
+        current_query = (getattr(study, "user_attrs", {}) or {}).get("query")
+        previous_reasoning = self.history.latest_reasoning(completed_trials, query=current_query)
+
+        raw_response = None
+        parsed_trace = None
+        plan = None
+        reasoning = previous_reasoning
+
+        # Warm-start transfer for cold-start clusters: if no local observation exists,
+        # directly evaluate the source cluster's best candidate as the first local point.
+        if warm_start and not observations:
+            candidate = {k: v for k, v in warm_start.items() if k in search_space}
+            if candidate:
+                params = self.search_space.sample_from_distributions(dists=search_space)
+                params.update(candidate)
+                self.trace_store.write(
+                    trial,
+                    raw=None,
+                    parsed={"mode": "warm_start_transfer", "cluster_id": current_cluster_id},
+                    plan={
+                        "mode": "warm_start_transfer",
+                        "candidate": dict(candidate),
+                        "candidate_strategy": {"mode": "warm_start_transfer"},
+                    },
+                    reasoning="Budget-aware warm-start transfer from high-synergy cluster best.",
                 )
-            )
-        return results
+                return params
+
+        if self.use_llm_guidance:
+            try:
+                param_specs = [spec.__dict__ for spec in numeric_specs] + [spec.__dict__ for spec in categorical_specs]
+                prompt = build_lgbo_numeric_prompt(
+                    query_text=query_text,
+                    objective_name=objective_name,
+                    param_specs=param_specs,
+                    history_lines=history_lines,
+                    previous_reasoning=previous_reasoning,
+                )
+                raw_response = self._call_llm(prompt)
+                if raw_response:
+                    preference, parsed_trace = self.preference_parser.parse_with_metadata(
+                        raw_response,
+                        [*numeric_specs, *categorical_specs],
+                    )
+                    reasoning = parsed_trace.get("thinking") or previous_reasoning
+                    plan = self.preference_planner.make_plan(preference, [*numeric_specs, *categorical_specs])
+                    if plan is not None:
+                        plan["utility"] = utility
+                        plan["adaptive_gamma"] = gamma
+            except Exception as exc:
+                plan = {
+                    "mode": "numeric_v1_fallback",
+                    "error": str(exc),
+                    "utility": utility,
+                    "adaptive_gamma": gamma,
+                }
+
+        candidate = self.candidates.propose(
+            plan=plan,
+            observations=observed_configs,
+            specs=surrogate_specs,
+            observation_records=observations,
+            higher_is_better=higher_is_better,
+            use_bayesian_surrogate=True,
+            metas=metas,
+        )
+
+        params = self.search_space.sample_from_distributions(dists=search_space)
+        params.update(candidate)
+        self.trace_store.write(
+            trial,
+            raw=raw_response,
+            parsed=parsed_trace,
+            plan={
+                **(plan or {"mode": "numeric_v1_fallback"}),
+                "candidate": dict(candidate),
+                "candidate_strategy": dict(self.candidates.last_strategy),
+            },
+            reasoning=reasoning or "LGBO unified surrogate candidate generation.",
+        )
+        return params
 
     def sample_independent(self, study: Study, trial: FrozenTrial, name: str, distribution: BaseDistribution):
         raise NotImplementedError("LGBOSampler only supports relative sampling")
@@ -97,180 +190,16 @@ class LGBOSampler:
     def after_trial(self, study: Study, trial: FrozenTrial, state, values):
         pass
 
-    def _prepare_trial_input(self, study: Study, ctx: Dict[str, Any], specs: Sequence[ParamSpec]) -> Dict[str, Any]:
-        completed_trials = ctx.get("completed_trials")
-        if completed_trials is None:
-            completed_trials = self.history.completed_trials(study)
-
-        observations = self.history.observations_from_trials(
-            completed_trials,
-            numeric_param_names=[spec.name for spec in specs],
-        )
-        observed_configs = self.history.observed_configs(observations)
-        objective_name = getattr(self.config.tuner.optimization, "objective_1_name", "objective")
-        higher_is_better = True
-        history_lines = self.history.build_lgbo_history_entries(
-            observations,
-            max_items=ctx.get("history_max_items"),
-            objective_name=objective_name,
-        )
-        query = ctx.get("query")
-        query_text = self._query_text(query) or self.history.latest_query_text(study, completed_trials)
-        previous_reasoning = self.history.latest_reasoning(completed_trials, query=query)
-        prompt = build_lgbo_prompt(
-            query_text=query_text,
-            objective_name=objective_name,
-            param_specs=[self.space.prompt_spec(spec) for spec in specs],
-            history_lines=history_lines,
-            previous_reasoning=previous_reasoning,
-            round_id=ctx.get("round_id"),
-            cluster_id=ctx.get("cluster_id"),
-            shared_region=ctx.get("shared_region"),
-        )
-        return {
-            "completed_trials": completed_trials,
-            "observations": observations,
-            "observed_configs": observed_configs,
-            "objective_name": objective_name,
-            "higher_is_better": higher_is_better,
-            "query": query,
-            "query_text": query_text,
-            "previous_reasoning": previous_reasoning,
-            "prompt": prompt,
-            "shared_region": ctx.get("shared_region"),
-        }
-
-    def _finalize_candidate(
-        self,
-        *,
-        trial: FrozenTrial,
-        raw_response: str | None,
-        prepared: Dict[str, Any],
-        search_space: Dict[str, BaseDistribution],
-        specs: Sequence[ParamSpec],
-    ) -> Dict[str, Any]:
-        parsed_trace = None
-        plan = None
-        reasoning = prepared.get("previous_reasoning")
-
-        try:
-            if raw_response:
-                preference, parsed_trace = self.preference_parser.parse_with_metadata(raw_response, specs)
-                reasoning = parsed_trace.get("thinking") or reasoning
-                plan = self.preference_planner.make_plan(preference, specs)
-        except Exception as exc:
-            plan = {
-                "mode": "mixed_v1_fallback",
-                "error": str(exc),
-            }
-
-        shared_region = prepared.get("shared_region")
-        active_plan = self.space.intersect_region_plans(shared_region, plan, specs)
-        if shared_region is not None and active_plan is None:
-            active_plan = shared_region
-
-        candidate = self.candidates.propose(
-            plan=active_plan,
-            observations=prepared["observed_configs"],
-            specs=specs,
-            observation_records=prepared["observations"],
-            higher_is_better=prepared["higher_is_better"],
-            use_bayesian_surrogate=True,
-        )
-
-        params = self.search_space.sample_from_distributions(dists=search_space)
-        params.update(candidate)
-        self.trace_store.write(
-            trial,
-            raw=raw_response,
-            parsed=parsed_trace,
-            plan={
-                **(active_plan or {"mode": "mixed_v1_fallback"}),
-                "candidate": dict(candidate),
-                "candidate_strategy": dict(self.candidates.last_strategy),
-                "shared_region": shared_region,
-            },
-            reasoning=reasoning or "LGBO V1 mixed-space fallback candidate generation.",
-        )
-        return params
-
-    def _query_text(self, query: Any) -> str | None:
-        if query is None:
-            return None
-        if isinstance(query, dict):
-            for key in ("question", "query", "task", "input", "prompt", "id"):
-                value = query.get(key)
-                if value:
-                    return str(value)
-        if isinstance(query, str):
-            return query
-        return str(query)
-
     def _call_llm(self, user_prompt: str) -> str | None:
         llm = self._get_llm()
         if llm is None:
             return None
+
         messages = [
-            {"role": "system", "content": LGBO_SYSTEM_PROMPT},
+            {"role": "system", "content": LGBO_NUMERIC_SYSTEM_PROMPT},
             {"role": "user", "content": user_prompt},
         ]
         return self._run_coro(llm.acompletion_text(messages=messages, stream=False))
-
-    def _call_llm_batch(self, prompts: Sequence[str]) -> list[str | None]:
-        llm = self._get_llm()
-        if llm is None:
-            return [None for _ in prompts]
-        return self._run_coro(self._acall_llm_batch(prompts))
-
-    async def _acall_llm_batch(self, prompts: Sequence[str]) -> list[str | None]:
-        llm = self._get_llm()
-        if llm is None:
-            return [None for _ in prompts]
-        if not prompts:
-            return []
-        max_parallel = min(self.MAX_TOTAL_REQUEST_CONCURRENCY, len(prompts))
-        semaphore = asyncio.Semaphore(max_parallel)
-
-        async def _one(prompt: str) -> str | None:
-            async with semaphore:
-                return await self._acall_prompt_with_immediate_failover(llm, prompt)
-
-        return await asyncio.gather(*(_one(prompt) for prompt in prompts))
-
-    async def _acall_prompt_with_immediate_failover(
-        self,
-        llm: Any,
-        prompt: str,
-    ) -> str | None:
-        messages = [
-            {"role": "system", "content": LGBO_SYSTEM_PROMPT},
-            {"role": "user", "content": prompt},
-        ]
-
-        if not hasattr(llm, "acquire_batch_slot") or not hasattr(llm, "release_batch_slot") or not hasattr(
-            llm, "acompletion_text_with_slot"
-        ):
-            return await llm.acompletion_text(messages=messages, stream=False)
-
-        slot_count_fn = getattr(llm, "batch_slot_count", None)
-        slot_attempts = max(1, int(slot_count_fn())) if callable(slot_count_fn) else 1
-        slot_attempts = min(slot_attempts, self.MAX_KEY_ATTEMPTS_PER_REQUEST)
-        last_error: Exception | None = None
-
-        for _ in range(slot_attempts):
-            slot_idx = await llm.acquire_batch_slot()
-            try:
-                return await llm.acompletion_text_with_slot(slot_idx=slot_idx, messages=messages, stream=False)
-            except Exception as exc:
-                # immediate key failover: no extra sleep here
-                last_error = exc
-            finally:
-                llm.release_batch_slot(slot_idx)
-
-        # Give up this prompt after N key attempts so one bad prompt does not block the round.
-        if last_error is not None:
-            return None
-        return None
 
     def _get_llm(self):
         if self.llm is None and getattr(self.config, "llms", None):

@@ -62,6 +62,9 @@ class OptimizationConfig(BaseModel):
     num_random_trials: int = Field(
         default=100, description="Number of random trials to run initially."
     )
+    llambo_k_candidates: int = Field(
+        default=5, description="Number of candidate configs LLAMBO generates per round for surrogate scoring."
+    )
     num_retries_unique_params: int = Field(
         default=100,
         description="Number of retries to find unique parameters for a trial.",
@@ -138,7 +141,63 @@ class OptimizationConfig(BaseModel):
     obj2_zscore: float = Field(
         default=1.645, description="Z-score for the second objective."
     )
-    sampler: T.Literal["tpe", "hierarchical", "llmbo", "lgbo"] = Field(
+    sampler: T.Literal["tpe", "hierarchical", "llmbo", "lgbo", "gpbo", "llm_tpe", "llambo"] = Field(
         default="tpe",
         description='Type of sampler to use (e.g., "tpe", "hierarchical").',
+    )
+    budget_aware_enabled: bool = Field(
+        default=False,
+        description="Enable budget-aware cluster-round allocation for LGBO.",
+    )
+    budget_per_round: int | None = Field(
+        default=None,
+        description="Per-round total trial budget B for budget-aware LGBO. If unset, defaults to number of clusters.",
+    )
+    budget_rounds: int | None = Field(
+        default=None,
+        description="Number of rounds T for budget-aware LGBO. If unset, defaults to root-level num_trials.",
+    )
+    budget_n_min: int = Field(
+        default=1,
+        description="Minimum floor trials per cluster per round (N_min).",
+    )
+    budget_tau: float = Field(
+        default=1.0,
+        description="Softmax temperature for utility-to-budget allocation.",
+    )
+    budget_ema_alpha: float = Field(
+        default=0.9,
+        description="EMA alpha used for utility smoothing.",
+    )
+    budget_gamma: float = Field(
+        default=0.2,
+        description="Adaptive lift gain gamma for lambda modulation.",
+    )
+    warm_start_synergy_threshold: float = Field(
+        default=0.6,
+        description="Synergy threshold above which cross-cluster warm-start transfer is enabled.",
+    )
+    cold_start_equal_rounds: int = Field(
+        default=1,
+        description="Number of initial rounds using equal budget allocation before utility-driven allocation.",
+    )
+    cluster_kmeans_enabled: bool = Field(
+        default=False,
+        description="Whether to run K-means clustering on query embeddings before training.",
+    )
+    cluster_kmeans_k: int = Field(
+        default=5,
+        description="Number of K-means clusters.",
+    )
+    cluster_kmeans_random_state: int = Field(
+        default=42,
+        description="Random seed used by K-means clustering.",
+    )
+    run_full_eval_before_after: bool = Field(
+        default=False,
+        description="Whether to run full-set per-cluster evaluation before and after training.",
+    )
+    eval_parallel_workers: int = Field(
+        default=1,
+        description="Number of parallel workers for query evaluation within each cluster trial.",
     )

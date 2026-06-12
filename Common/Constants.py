@@ -96,7 +96,7 @@ CONFIG_ROOT = Path.home() / "Option"
 
 # Timeout
 USE_CONFIG_TIMEOUT = 0  # Using llm.timeout configuration.
-LLM_API_TIMEOUT = 300
+LLM_API_TIMEOUT = 30
 
 # Split tokens
 GRAPH_FIELD_SEP = "<SEP>"

@@ -89,9 +89,6 @@ class BaseLLM(ABC):
     def _default_system_msg(self):
         return self._system_msg(self.system_prompt)
 
-    def _get_request_semaphore(self):
-        return self.semaphore
-
     def _update_costs(self, usage: Union[dict, BaseModel], model: str = None, local_calc_usage: bool = True):
         """update each request's token cost
         Args:
@@ -237,7 +234,7 @@ class BaseLLM(ABC):
         if stream is None:
             stream = self.config.stream
         # logger.debug(message)
-        async with self._get_request_semaphore():
+        async with self.semaphore:
          rsp = await self.acompletion_text(message, stream=stream, timeout=self.get_timeout(timeout), max_tokens = max_tokens, format = format)
         return rsp
 

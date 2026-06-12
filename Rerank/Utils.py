@@ -264,6 +264,8 @@ def get_device(
                 device = "mps"
             else:
                 device = "cpu"
+        elif isinstance(device, str) and device.startswith("cuda") and not torch.cuda.is_available():
+            device = "cpu"
         return device
 
 def get_dtype(

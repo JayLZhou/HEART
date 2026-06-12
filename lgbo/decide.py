@@ -48,13 +48,13 @@ def decide_preference(
     E_soft_low: float = 2.0,
     E_soft_high: float = 6.0,
 ) -> Dict[str, Any]:
-    assert 0.0 < confidence < 1.0, 
+    assert 0.0 < confidence < 1.0
     plan: Dict[str, Any] = {"kind_input": kind}
     delta = confidence_to_delta(confidence, scale=1.0, two_sided=False)
     plan["delta"] = float(delta)
 
     if kind == "region":
-        assert (region_box is not None) or (region_center is not None and region_radius is not None), \
+        assert (region_box is not None) or (region_center is not None and region_radius is not None)
 
         if region_box is None:
             lb, ub = _box_from_center_radius(region_center, float(region_radius))
@@ -94,7 +94,7 @@ def decide_preference(
         return plan
 
     if kind == "value":
-        assert y_star is not None,
+        assert y_star is not None
         plan.update({
             "mode": "value",
             "y_star": y_star,
@@ -103,7 +103,7 @@ def decide_preference(
         return plan
 
     if kind == "point":
-        assert x_star is not None, 
+        assert x_star is not None
         plan.update({
             "mode": "point",
             "x_star": x_star,

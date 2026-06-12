@@ -10,7 +10,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 
-from optuna.distributions import CategoricalDistribution, FloatDistribution, IntDistribution
+from optuna.distributions import FloatDistribution, IntDistribution
 
 
 def _ensure_package(name: str) -> None:
@@ -44,6 +44,10 @@ history_module = _load_module(
     "Tuner.BOTuner.lgbo_components.history",
     "Tuner/BOTuner/lgbo_components/history.py",
 )
+_load_module(
+    "Tuner.BOTuner.lgbo_components.unified_surrogate",
+    "Tuner/BOTuner/lgbo_components/unified_surrogate.py",
+)
 preference_module = _load_module(
     "Tuner.BOTuner.lgbo_components.preference",
     "Tuner/BOTuner/lgbo_components/preference.py",
@@ -58,12 +62,10 @@ candidate_module = _load_module(
 )
 
 build_lgbo_numeric_prompt = prompt_module.build_lgbo_numeric_prompt
-build_lgbo_prompt = prompt_module.build_lgbo_prompt
 LGBOCandidateGenerator = candidate_module.LGBOCandidateGenerator
 LGBOHistoryAdapter = history_module.LGBOHistoryAdapter
 LGBOPreferenceParser = preference_module.LGBOPreferenceParser
 LGBOPreferencePlanner = preference_module.LGBOPreferencePlanner
-MixedSearchSpaceAdapter = search_space_module.MixedSearchSpaceAdapter
 NumericSearchSpaceAdapter = search_space_module.NumericSearchSpaceAdapter
 LGBOTraceStore = trace_store_module.LGBOTraceStore
 
@@ -97,19 +99,6 @@ class LGBOComponentTests(unittest.TestCase):
         }
         filtered = adapter.filter_numeric_distributions(dists)
         self.assertEqual(set(filtered), {"rag_top_k", "rag_hybrid_bm25_weight"})
-
-    def test_mixed_search_space_includes_categorical(self):
-        adapter = MixedSearchSpaceAdapter()
-        dists = {
-            "rag_top_k": IntDistribution(2, 10, step=1),
-            "template_name": CategoricalDistribution(["default", "cot"]),
-            "rag_query_decomposition_enabled": CategoricalDistribution([True, False]),
-        }
-        specs = adapter.build_specs(dists)
-        kinds = {spec.name: spec.kind for spec in specs}
-        self.assertEqual(kinds["rag_top_k"], "int")
-        self.assertEqual(kinds["template_name"], "categorical")
-        self.assertEqual(kinds["rag_query_decomposition_enabled"], "bool")
 
     def test_history_adapter_extracts_completed_numeric_observations(self):
         adapter = LGBOHistoryAdapter()
@@ -148,29 +137,11 @@ class LGBOComponentTests(unittest.TestCase):
         )
         plan = LGBOPreferencePlanner().make_plan(pref, specs)
         self.assertEqual(meta["mode"], "point")
-        self.assertEqual(plan["mode"], "region-soft")
-        self.assertEqual(plan["point"]["rag_top_k"], 6.0)
+        # Planner uses ``lgbo.decide`` on unified [0,1]^d coordinates.
+        self.assertIn(plan["mode"], ("point", "region", "region-soft"))
+        self.assertGreaterEqual(plan["point"]["rag_top_k"], 0.0)
+        self.assertLessEqual(plan["point"]["rag_top_k"], 1.0)
         self.assertIn("thinking", meta)
-
-    def test_preference_parser_and_planner_support_categorical_literals(self):
-        specs = MixedSearchSpaceAdapter().build_specs(
-            {
-                "template_name": CategoricalDistribution(["default", "cot"]),
-                "rag_method": CategoricalDistribution(["dense", "hybrid", "sparse"]),
-                "rag_top_k": IntDistribution(2, 10, step=1),
-            }
-        )
-        parser = LGBOPreferenceParser()
-        pref, meta = parser.parse_with_metadata(
-            'Final Answer:\n[point, ["cot", "hybrid", 8], 0.7]',
-            specs,
-        )
-        plan = LGBOPreferencePlanner().make_plan(pref, specs)
-        self.assertEqual(meta["mode"], "point")
-        self.assertEqual(pref.values["template_name"], "cot")
-        self.assertEqual(pref.values["rag_method"], "hybrid")
-        self.assertEqual(plan["lower"]["template_name"], "cot")
-        self.assertEqual(plan["upper"]["rag_method"], "hybrid")
 
     def test_preference_parser_accepts_bareword_point(self):
         specs = NumericSearchSpaceAdapter().build_specs(
@@ -276,55 +247,13 @@ class LGBOComponentTests(unittest.TestCase):
         self.assertGreaterEqual(candidate["rag_hybrid_bm25_weight"], 0.1)
         self.assertLessEqual(candidate["rag_hybrid_bm25_weight"], 0.9)
 
-    def test_candidate_generator_can_propose_categorical_values(self):
-        generator = LGBOCandidateGenerator()
-        specs = MixedSearchSpaceAdapter().build_specs(
-            {
-                "template_name": CategoricalDistribution(["default", "cot"]),
-                "rag_method": CategoricalDistribution(["dense", "hybrid", "sparse"]),
-                "rag_top_k": IntDistribution(2, 10, step=1),
-            }
-        )
-        records = [
-            types.SimpleNamespace(
-                params={"template_name": "default", "rag_method": "dense", "rag_top_k": 3},
-                objective=0.20,
-            ),
-            types.SimpleNamespace(
-                params={"template_name": "cot", "rag_method": "hybrid", "rag_top_k": 8},
-                objective=0.95,
-            ),
-            types.SimpleNamespace(
-                params={"template_name": "default", "rag_method": "sparse", "rag_top_k": 5},
-                objective=0.40,
-            ),
-        ]
-        plan = {
-            "mode": "point",
-            "point": {"template_name": "cot", "rag_method": "hybrid", "rag_top_k": 8},
-            "confidence": 0.8,
-        }
-        candidate = generator.propose(
-            plan=plan,
-            observations=[record.params for record in records],
-            specs=specs,
-            observation_records=records,
-            higher_is_better=True,
-            use_bayesian_surrogate=True,
-        )
-        self.assertEqual(candidate["template_name"], "cot")
-        self.assertIn(candidate["rag_method"], {"dense", "hybrid", "sparse"})
-        self.assertGreaterEqual(candidate["rag_top_k"], 2)
-        self.assertLessEqual(candidate["rag_top_k"], 10)
-
     def test_prompt_builder_includes_history_and_reasoning(self):
-        prompt = build_lgbo_prompt(
+        prompt = build_lgbo_numeric_prompt(
             query_text="Answer the user question accurately.",
             objective_name="accuracy",
             param_specs=[
                 {"name": "rag_top_k", "low": 2, "high": 10, "kind": "int"},
                 {"name": "rag_hybrid_bm25_weight", "low": 0.1, "high": 0.9, "kind": "float"},
-                {"name": "template_name", "choices": ["default", "cot"], "kind": "categorical"},
             ],
             history_lines=["recent_1: objective=0.82; params=(rag_top_k=7) best_so_far"],
             previous_reasoning="Hybrid retrieval seems promising.",
@@ -332,7 +261,6 @@ class LGBOComponentTests(unittest.TestCase):
         self.assertIn("Completed trial history:", prompt)
         self.assertIn("Hybrid retrieval seems promising.", prompt)
         self.assertIn("Answer the user question accurately.", prompt)
-        self.assertIn("choices=['default', 'cot']", prompt)
 
     def test_trace_store_writes_attrs(self):
         trial = FakeTrial({}, 0.0)
@@ -350,3 +278,4 @@ class LGBOComponentTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

@@ -1,6 +1,7 @@
 import pandas as pd
 from torch.utils.data import Dataset
 import os
+import numpy as np
 
 class RAGDataset(Dataset):
     def __init__(self,data_dir):
@@ -31,7 +32,14 @@ class RAGDataset(Dataset):
         answer = self.dataset.iloc[idx]["answer"]
         # other_attrs = self.dataset.iloc[idx].drop(["answer", "question"])
         other_attrs = self.dataset.iloc[idx].drop(["answer", "question"])
-        return {"id": idx, "question": question, "answer": answer, **other_attrs}
+
+        def _to_native(v):
+            if isinstance(v, np.generic):
+                return v.item()
+            return v
+
+        other_attrs_native = {k: _to_native(v) for k, v in other_attrs.to_dict().items()}
+        return {"id": int(idx), "question": str(question), "answer": str(answer), **other_attrs_native}
 
 
 if __name__ == "__main__":

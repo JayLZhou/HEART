@@ -2,61 +2,82 @@ from __future__ import annotations
 
 from typing import Any, Dict, Sequence
 
-from Tuner.BOTuner.lgbo_components.search_space import MixedSearchSpaceAdapter, ParamSpec
+from Tuner.BOTuner.lgbo_components.search_space import NumericParamSpec, NumericSearchSpaceAdapter
+from Tuner.BOTuner.lgbo_components.unified_surrogate import SurrogateMeta, params_to_unit, unit_dict_to_params
 
 
 class LGBOCandidateGenerator:
-    """Mixed-space LGBO candidate generator.
+    """Propose trial points for LGBO (GP + tilt in ``[0,1]^d`` when ``metas`` is set).
 
-    The planner still uses paper-style point / region preferences, while the
-    surrogate maps mixed HEART parameters into a continuous encoded space.
+    With ``metas``, ``specs`` are surrogate dimensions ``[0, 1]`` and proposals are
+    decoded to physical Optuna params via :func:`unit_dict_to_params`. Without
+    ``metas``, uses legacy physical numeric ``specs`` only.
     """
 
     def __init__(self) -> None:
-        self.space = MixedSearchSpaceAdapter()
+        self.space = NumericSearchSpaceAdapter()
         self.last_strategy: Dict[str, Any] = {}
+
+    @staticmethod
+    def _default_center(spec: NumericParamSpec) -> float:
+        return float((spec.low + spec.high) / 2.0)
+
+    def _midpoint_from_region(self, plan: Dict[str, Any], specs: Sequence[NumericParamSpec]) -> Dict[str, float]:
+        """Box center per surrogate dimension; missing keys in the plan use spec center."""
+        lower = plan.get("lower") or {}
+        upper = plan.get("upper") or {}
+        point = plan.get("point") or {}
+        out: Dict[str, float] = {}
+        for spec in specs:
+            if spec.name in lower and spec.name in upper:
+                out[spec.name] = (float(lower[spec.name]) + float(upper[spec.name])) / 2.0
+            elif spec.name in point:
+                out[spec.name] = float(point[spec.name])
+            else:
+                out[spec.name] = self._default_center(spec)
+        return out
+
+    def _merge_partial_point(
+        self, base: Dict[str, float], partial: Dict[str, Any] | None, specs: Sequence[NumericParamSpec]
+    ) -> Dict[str, Any]:
+        merged: Dict[str, Any] = {**base}
+        if partial:
+            merged.update(partial)
+        for spec in specs:
+            if spec.name not in merged:
+                merged[spec.name] = self._default_center(spec)
+        return merged
 
     def propose(
         self,
         plan: Dict[str, Any] | None,
         observations: Sequence[Dict[str, Any]],
-        specs: Sequence[ParamSpec],
+        specs: Sequence[NumericParamSpec],
         *,
         observation_records: Sequence[Any] | None = None,
         higher_is_better: bool = True,
         use_bayesian_surrogate: bool = False,
+        metas: Sequence[SurrogateMeta] | None = None,
     ) -> Dict[str, Any]:
         self.last_strategy = {"mode": "heuristic"}
+        unified = metas is not None and len(metas) == len(specs)
+
         if use_bayesian_surrogate and observation_records:
             try:
-                from Tuner.BOTuner.lgbo_components.surrogate import LGBOMixedBayesGenerator
+                from Tuner.BOTuner.lgbo_components.surrogate import LGBONumericBayesGenerator
 
-                candidate = LGBOMixedBayesGenerator().propose(
+                candidate = LGBONumericBayesGenerator().propose(
                     plan=plan,
                     observations=observation_records,
                     specs=specs,
                     higher_is_better=higher_is_better,
+                    metas=metas if unified else None,
                 )
-                if plan and plan.get("mode") == "region-soft" and plan.get("point"):
-                    anchor = self.space.clip_point_to_region(plan["point"], plan, specs)
-                    confidence = float(plan.get("confidence", 0.5))
-                    blended = {}
-                    for spec in specs:
-                        if spec.kind in {"float", "int"}:
-                            blended[spec.name] = (
-                                (1.0 - confidence) * float(candidate[spec.name])
-                                + confidence * float(anchor[spec.name])
-                            )
-                        else:
-                            blended[spec.name] = anchor[spec.name]
-                    candidate = blended
-                if not (plan and plan.get("mode") == "point"):
-                    candidate = self.space.clip_point_to_region(candidate, plan, specs)
                 self.last_strategy = {
                     "mode": "bayes_surrogate",
                     "plan_mode": (plan or {}).get("mode", "none"),
                 }
-                return self.space.clip_point(candidate, specs)
+                return candidate
             except Exception as exc:
                 self.last_strategy = {
                     "mode": "heuristic_fallback",
@@ -64,38 +85,44 @@ class LGBOCandidateGenerator:
                     "plan_mode": (plan or {}).get("mode", "none"),
                 }
 
+        def _clip_u(d: Dict[str, Any]) -> Dict[str, Any]:
+            if unified:
+                return unit_dict_to_params(self.space.clip_point(d, specs), metas)
+            return self.space.clip_point(d, specs)
+
         if plan and plan.get("mode") == "point":
-            candidate = self.space.clip_point(plan["point"], specs)
-            return self.space.clip_point_to_region(candidate, plan, specs)
+            return _clip_u(plan["point"])
 
         if plan and plan.get("mode") == "region-soft":
-            midpoint = self._region_midpoint(plan, specs)
-            anchor = self.space.clip_point(plan.get("point", midpoint), specs)
+            midpoint = self._midpoint_from_region(plan, specs)
+            anchor = self.space.clip_point(
+                self._merge_partial_point(midpoint, plan.get("point"), specs),
+                specs,
+            )
             confidence = float(plan.get("confidence", 0.5))
-            candidate = {}
+            candidate_u = {}
             for spec in specs:
-                if spec.kind in {"float", "int"}:
-                    candidate[spec.name] = (
-                        confidence * float(anchor[spec.name])
-                        + (1.0 - confidence) * float(midpoint[spec.name])
-                    )
-                else:
-                    candidate[spec.name] = anchor[spec.name]
-            candidate = self.space.clip_point(candidate, specs)
-            return self.space.clip_point_to_region(candidate, plan, specs)
+                candidate_u[spec.name] = confidence * float(anchor[spec.name]) + (1.0 - confidence) * float(
+                    midpoint[spec.name]
+                )
+            return _clip_u(candidate_u)
 
         if plan and plan.get("mode") == "region":
-            midpoint = self._region_midpoint(plan, specs)
-            midpoint = self.space.clip_point(midpoint, specs)
-            return self.space.clip_point_to_region(midpoint, plan, specs)
+            midpoint = self._midpoint_from_region(plan, specs)
+            return _clip_u(midpoint)
 
         best = self._best_observation(observations, observation_records=observation_records, higher_is_better=higher_is_better)
         if best:
-            best = self.space.clip_point(best, specs)
-            return self.space.clip_point_to_region(best, plan, specs)
+            if unified:
+                u = params_to_unit(best, metas)
+                u = self.space.clip_point(u, specs)
+                return unit_dict_to_params(u, metas)
+            return self.space.clip_point(best, specs)
 
-        default = self.space.default_point(specs)
-        return self.space.clip_point_to_region(default, plan, specs)
+        mid = {spec.name: self.space._coerce_value((spec.low + spec.high) / 2.0, spec) for spec in specs}
+        if unified:
+            return unit_dict_to_params(mid, metas)
+        return mid
 
     def _best_observation(
         self,
@@ -118,23 +145,3 @@ class LGBOCandidateGenerator:
         if observations:
             return observations[-1]
         return None
-
-    def _region_midpoint(self, plan: Dict[str, Any], specs: Sequence[ParamSpec]) -> Dict[str, Any]:
-        midpoint: Dict[str, Any] = {}
-        point_hint = plan.get("point", {})
-        for spec in specs:
-            if spec.kind in {"float", "int"}:
-                midpoint[spec.name] = (
-                    float(plan["lower"][spec.name]) + float(plan["upper"][spec.name])
-                ) / 2.0
-                continue
-            if spec.name in point_hint:
-                midpoint[spec.name] = point_hint[spec.name]
-                continue
-            lower = plan["lower"].get(spec.name)
-            upper = plan["upper"].get(spec.name)
-            if lower is not None and upper is not None and lower == upper:
-                midpoint[spec.name] = lower
-            else:
-                midpoint[spec.name] = spec.choices[0] if spec.choices else None
-        return midpoint

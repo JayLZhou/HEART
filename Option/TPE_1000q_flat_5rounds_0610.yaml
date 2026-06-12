@@ -1,0 +1,31 @@
+llms:
+  - api_type: "openai"
+    base_url: "http://localhost:8001/v1"
+    model: "qwen2.5-7b"
+    api_key: "sk-local"
+embedding:
+  api_type: "openai"
+  base_url: "http://localhost:8017/v1"
+  api_key: "sk-local"
+  model: "Qwen3-Embedding-0.6B"
+  dimensions: 1024
+  embed_batch_size: 64
+llm_model_max_token_size: 8192
+num_trials: 20
+tuner:
+  name: tpe_1000q_flat_5rounds_0610
+  reuse_study: false
+  recreate_study: true
+  optimization:
+    sampler: tpe
+    budget_per_round: 1000
+    budget_rounds: 5
+    budget_n_min: 1
+    run_full_eval_before_after: true
+    eval_parallel_workers: 32
+    cluster_kmeans_enabled: true
+    cluster_kmeans_k: 5
+    cluster_kmeans_random_state: 42
+data_root: /data1/yujia/HEART/HEART/agent_workspace/datasets
+working_dir: /data1/yujia/HEART/HEART/agent_workspace/runs
+exp_name: tpe_1000q_flat_5rounds_0610

@@ -37,10 +37,6 @@ class Config(WorkingParams, YamlModel):
     faiss_hnsw_ef_construction: int = 40
     faiss_metric: str = "l2"
     sparse_index_type: str = "bm25"  # bm25
-    faiss_hnsw_m: int = 32
-    faiss_hnsw_ef_search: int = 64
-    faiss_hnsw_ef_construction: int = 40
-    faiss_metric: str = "l2"
     tuner_type: TunerType = TunerType.BO
     token_model: str = "gpt-3.5-turbo"
     
@@ -75,14 +71,19 @@ class Config(WorkingParams, YamlModel):
 
     @classmethod
     def parse(cls, _path, dataset_name):
-        """Parse config from yaml file"""
+        """Parse config from yaml file.
+
+        Defaults load first; the ``-opt`` experiment YAML is merged last so it
+        overrides ``Option/Config2.yaml`` (and ``~/Option/Config2.yaml``).
+        """
+        opt_path = Path(_path)
         default_config_paths: List[Path] = [
             PROJECT_ROOT / "Option/Config2.yaml",
             CONFIG_ROOT / "Config2.yaml",
         ]
         opt = [Config.read_yaml(path) for path in default_config_paths]
-        opt.append(parse(_path))
-    
+        opt.append(parse(opt_path))
+
         final = merge_dict(opt)
         final["dataset_name"] = dataset_name
         final["working_dir"] = os.path.join(final["working_dir"], dataset_name)
@@ -120,7 +121,8 @@ class Config(WorkingParams, YamlModel):
             return self.llm
         return None
     
-def parse(opt_path):    
+def parse(opt_path):
+    opt_path = Path(opt_path)
     with open(opt_path, mode='r') as f:
         opt = YamlModel.read_yaml(opt_path)
     # export CUDA_VISIBLE_DEVICES

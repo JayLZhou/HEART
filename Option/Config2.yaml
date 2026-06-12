@@ -2,9 +2,9 @@
 # Multiple LLM configurations pool (model name is the unique key)
 llms:
   - api_type: "openai"
-    base_url: "https://api.siliconflow.cn/v1"
-    model: "Qwen/Qwen3-8B"
-    api_key: "${SILICONFLOW_API_KEY}"
+    base_url: "http://localhost:8001/v1"
+    model: "qwen2.5-7b"
+    api_key: "sk-local"
   # - api_type: "openai"
   #   base_url: "https://cfcus02.opapi.win/v1"
   #   model: "TA/meta-llama/Llama-3-8b-chat-hf"
@@ -19,26 +19,23 @@ llms:
   #   api_key: "${OPAPI_API_KEY}"
 
 
+# OpenAI 兼容接口：与上方 llms 相同硅基流动 Key / base_url（/v1/embeddings）
 embedding:
-  api_type: "modelscope"  # or  ollama / etc.
-  base_url: "http://localhost:8007/v1"  # or forward url / other llm url
-  api_key: "${EMBEDDING_API_KEY}"
-  # api_key: "${EMBEDDING_API_KEY:-YOUR_API_KEY}"
+  api_type: "openai"
+  base_url: "http://localhost:8017/v1"
+  api_key: "sk-local"
   model: "Qwen3-Embedding-0.6B"
-  cache_folder: ""
   dimensions: 1024
   max_token_size: 8102
-  embed_batch_size: 128
-  target_devices: ["cuda:4"]
-  backend: "openai"
-  embedding_func_max_async: 16
+  embed_batch_size: 64
  
-data_root: /mnt/data/wangshu/hcarag/ids_data # Root directory for data
+data_root: /data1/yujia/HEART/HEART/agent_workspace/datasets # Root directory for data
 
-working_dir: /mnt/data/yingli/RAGTuner/ # Result directory for the experiment
+working_dir: /data1/yujia/HEART/HEART/agent_workspace/runs # Result directory for the experiment
 exp_name: tpebo # Experiment name
+vdb_type: faiss
 faiss_hnsw_m: 32
 faiss_hnsw_ef_search: 64
 faiss_hnsw_ef_construction: 40
-faiss_metric: "l2"
+faiss_metric: l2
 # 

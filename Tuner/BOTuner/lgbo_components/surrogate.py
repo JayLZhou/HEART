@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import math
-from itertools import islice
 from typing import Any, Dict, Sequence
 
 import torch
@@ -16,7 +15,12 @@ from gpytorch.mlls.exact_marginal_log_likelihood import ExactMarginalLogLikeliho
 from torch import Tensor
 
 from Tuner.BOTuner.lgbo_components.history import LGBOObservation
-from Tuner.BOTuner.lgbo_components.search_space import MixedSearchSpaceAdapter, ParamSpec
+from Tuner.BOTuner.lgbo_components.search_space import NumericParamSpec, NumericSearchSpaceAdapter
+from Tuner.BOTuner.lgbo_components.unified_surrogate import (
+    SurrogateMeta,
+    params_to_unit,
+    unit_dict_to_params,
+)
 
 
 def _make_sobol_grid_norm(dim: int, n_points: int, dtype: torch.dtype, device: torch.device) -> Tensor:
@@ -212,15 +216,21 @@ class TiltedModel(Model):
         return getattr(object.__getattribute__(self, "base_model"), name)
 
 
-class LGBOMixedBayesGenerator:
-    """Fit a mixed surrogate over encoded HEART parameters and optimize qLogEI."""
+class LGBONumericBayesGenerator:
+    """GP + qLogEI in ``[0,1]^d`` (reference ``lgbo/boo.py`` style).
+
+    When ``metas`` is provided, *all* tunable dimensions (numeric + categorical)
+    share one normalized box: categoricals use index/fraction encoding (see
+    :mod:`unified_surrogate`). Training rows are built with :func:`params_to_unit`.
+    When ``metas`` is ``None``, ``specs`` are physical numeric bounds (legacy).
+    """
 
     def __init__(
         self,
         *,
-        candidate_pool_size: int = 8192,
-        grid_size: int = 512,
-        mc_paths: int = 512,
+        candidate_pool_size: int = 2048,
+        grid_size: int = 256,
+        mc_paths: int = 256,
         min_dist: float | None = None,
         dtype: torch.dtype = torch.double,
     ) -> None:
@@ -229,16 +239,16 @@ class LGBOMixedBayesGenerator:
         self.mc_paths = mc_paths
         self.min_dist = min_dist
         self.dtype = dtype
-        self.space = MixedSearchSpaceAdapter()
-        self.max_category_assignments = 256
+        self.space = NumericSearchSpaceAdapter()
 
     def propose(
         self,
         *,
         plan: Dict[str, Any] | None,
         observations: Sequence[LGBOObservation],
-        specs: Sequence[ParamSpec],
+        specs: Sequence[NumericParamSpec],
         higher_is_better: bool = True,
+        metas: Sequence[SurrogateMeta] | None = None,
     ) -> Dict[str, Any]:
         if len(observations) < 2:
             raise ValueError("Need at least two completed observations for surrogate fitting")
@@ -247,7 +257,12 @@ class LGBOMixedBayesGenerator:
         train_x = []
         train_y = []
         for obs in observations:
-            train_x.append(self.space.encode_point(obs.params, specs))
+            if metas is not None and len(metas) == len(specs):
+                pu = params_to_unit(obs.params, metas)
+                train_x.append([pu[m.name] for m in metas])
+            else:
+                normalized = self.space.normalize_point(obs.params, specs)
+                train_x.append([normalized[spec.name] for spec in specs])
             objective = float(obs.objective)
             train_y.append(objective if higher_is_better else -objective)
 
@@ -257,8 +272,8 @@ class LGBOMixedBayesGenerator:
 
         bounds = torch.stack(
             [
-                torch.zeros(self.space.encoded_dim(specs), dtype=self.dtype, device=device),
-                torch.ones(self.space.encoded_dim(specs), dtype=self.dtype, device=device),
+                torch.zeros(len(specs), dtype=self.dtype, device=device),
+                torch.ones(len(specs), dtype=self.dtype, device=device),
             ],
             dim=0,
         )
@@ -273,83 +288,57 @@ class LGBOMixedBayesGenerator:
             best_f=Y_std.max(),
             sampler=SobolQMCNormalSampler(sample_shape=torch.Size([self.mc_paths])),
         )
-        acq_fn = acquisition
-        if plan and plan.get("mode") == "point":
-            x_star_point = plan.get("x_star") or plan.get("point")
-            if x_star_point:
-                x_star = torch.tensor(
-                    self.space.encode_point(x_star_point, specs),
-                    dtype=self.dtype,
-                    device=device,
-                )
-                sigma = max(1e-6, float(plan.get("delta", 0.6)))
-
-                def _acq_with_point_prior(Xq: Tensor) -> Tensor:
-                    vals = acquisition(Xq).view(-1)
-                    Xflat = Xq[:, 0, :] if Xq.ndim == 3 else Xq
-                    sqdist = ((Xflat - x_star.unsqueeze(0)) ** 2).sum(dim=-1)
-                    log_prior = -0.5 * sqdist / (sigma * sigma)
-                    return vals + log_prior
-
-                acq_fn = _acq_with_point_prior
-        plan_for_candidates = plan
-        # Align with lgbo/boo.py point mode behavior: point prior guides
-        # acquisition, but sampling remains global (no hard single-point clip).
-        if plan and plan.get("mode") == "point":
-            plan_for_candidates = None
-        candidate_points = self._candidate_points(specs, plan=plan_for_candidates)
-        encoded_candidates = torch.tensor(
-            [self.space.encode_point(point, specs) for point in candidate_points],
-            dtype=self.dtype,
-            device=device,
-        )
-        proposed = _greedy_select_with_min_dist(acq_fn, encoded_candidates, n=1, r_min=self.min_dist)
-        selected = proposed[0]
-        best_idx = int(torch.argmin(torch.cdist(encoded_candidates, selected.unsqueeze(0))).item())
-        return self.space.clip_point(candidate_points[best_idx], specs)
+        candidates = _make_sobol_grid_norm(len(specs), self.candidate_pool_size, self.dtype, device)
+        proposed = _greedy_select_with_min_dist(acquisition, candidates, n=1, r_min=self.min_dist)
+        point = {
+            spec.name: float(proposed[0, idx].item())
+            for idx, spec in enumerate(specs)
+        }
+        clipped = self.space.clip_point(point, specs)
+        if metas is not None:
+            return unit_dict_to_params(clipped, metas)
+        return self.space.denormalize_point(clipped, specs)
 
     def _build_effective_model(
         self,
         *,
         model: Model,
         plan: Dict[str, Any] | None,
-        specs: Sequence[ParamSpec],
+        specs: Sequence[NumericParamSpec],
         bounds: Tensor,
     ) -> Model:
         if not plan:
             return model
 
         mode = plan.get("mode")
-        if mode not in {"region", "region-soft"}:
+        if mode not in {"region", "region-soft", "point"}:
             return model
-        lower = plan["lower"]
-        upper = plan["upper"]
-        region_info = plan.get("region", {}) if isinstance(plan.get("region"), dict) else {}
-        smooth_override = region_info.get("smooth")
-        if smooth_override is None:
-            smooth = 0.08 if mode == "region-soft" else None
-        else:
-            smooth = float(smooth_override)
-        grid_size = int(region_info.get("grid_size", self.grid_size))
 
-        lower_enc, upper_enc = self.space.encode_region_bounds(
-            {"lower": lower, "upper": upper},
-            specs,
-        )
-        lb = torch.tensor(lower_enc, dtype=self.dtype, device=bounds.device)
-        ub = torch.tensor(upper_enc, dtype=self.dtype, device=bounds.device)
+        if mode == "point":
+            lower = plan["point"]
+            upper = plan["point"]
+            smooth = 0.08
+        else:
+            lower = plan["lower"]
+            upper = plan["upper"]
+            smooth = 0.08 if mode == "region-soft" else None
+
+        lower_norm = self.space.normalize_point(lower, specs)
+        upper_norm = self.space.normalize_point(upper, specs)
+        lb = torch.tensor([lower_norm[spec.name] for spec in specs], dtype=self.dtype, device=bounds.device)
+        ub = torch.tensor([upper_norm[spec.name] for spec in specs], dtype=self.dtype, device=bounds.device)
         tilt = LinearExponentialRegionalMeanTiltPlugAndPlay(
             bounds=bounds,
-            grid_size=grid_size,
+            grid_size=self.grid_size,
             smooth=smooth,
             dtype=self.dtype,
             device=bounds.device,
         )
         tilt.set_box_region(lb, ub)
-        delta = float(plan.get("delta", _norm_ppf(float(plan.get("confidence", 0.5)))))
         tilt.fit_lambda_by_delta(
             base_model=model,
-            delta=delta,
+            delta=_norm_ppf(float(plan.get("confidence", 0.5)))
+            * (1.0 + float(plan.get("adaptive_gamma", 0.0)) * float(plan.get("utility", 0.0))),
             observation_noise=False,
         )
         tilt.prepare_cache(model)
@@ -361,43 +350,3 @@ class LGBOMixedBayesGenerator:
             torch.tensor(1e-12, dtype=Y.dtype, device=Y.device)
         )
         return (Y - mean) / std, mean, std
-
-    def _candidate_points(self, specs: Sequence[ParamSpec], plan: Dict[str, Any] | None = None) -> list[Dict[str, Any]]:
-        categorical_assignments = self.space.enumerate_categorical_assignments(specs)
-        if len(categorical_assignments) > self.max_category_assignments:
-            categorical_assignments = list(islice(categorical_assignments, self.max_category_assignments))
-
-        numeric_specs = self.space.numeric_specs(specs)
-        if numeric_specs:
-            numeric_grid = _make_sobol_grid_norm(
-                len(numeric_specs),
-                max(1, self.candidate_pool_size // max(1, len(categorical_assignments))),
-                self.dtype,
-                torch.device("cpu"),
-            )
-            numeric_points = []
-            for row in numeric_grid:
-                numeric_points.append(
-                    self.space.denormalize_numeric_point(
-                        {
-                            spec.name: float(row[idx].item())
-                            for idx, spec in enumerate(numeric_specs)
-                        },
-                        specs,
-                    )
-                )
-        else:
-            numeric_points = [{}]
-
-        candidates: list[Dict[str, Any]] = []
-        for cat in categorical_assignments:
-            for num in numeric_points:
-                point = self.space.clip_point(self.space.merge_points(num, cat), specs)
-                if self.space.point_in_region(point, plan, specs):
-                    candidates.append(point)
-        if not candidates:
-            fallback = self.space.default_point(specs)
-            if plan:
-                fallback = self.space.clip_point_to_region(fallback, plan, specs)
-            return [fallback]
-        return candidates

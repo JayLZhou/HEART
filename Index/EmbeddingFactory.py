@@ -2,7 +2,6 @@ from __future__ import annotations
 import typing as T
 from typing import Any
 from llama_index.core.embeddings import BaseEmbedding
-from llama_index.embeddings.ollama import OllamaEmbedding
 from llama_index.embeddings.openai import OpenAIEmbedding
 try:
     from llama_index.embeddings.huggingface import HuggingFaceEmbedding
@@ -61,8 +60,10 @@ class RAGEmbeddingFactory(GenericFactory):
         self._try_set_model_and_batch_size(params, config)
         return OpenAIEmbedding(**params)
 
-    def _create_ollama(self, config) -> OllamaEmbedding:
+    def _create_ollama(self, config):
         """Create Ollama embedding."""
+        from llama_index.embeddings.ollama import OllamaEmbedding
+
         params = dict(base_url=config.embedding.base_url)
         self._try_set_model_and_batch_size(params, config)
         return OllamaEmbedding(**params)

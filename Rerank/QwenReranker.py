@@ -47,6 +47,11 @@ class QwenReranker(BaseRanking):
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
 
+        # Workaround: transformers sets ALL_PARALLEL_STYLES=None when torch distributed
+        # is unavailable, but Qwen3's tp_plan validation in post_init crashes on None.
+        import transformers.modeling_utils as _mu
+        if _mu.ALL_PARALLEL_STYLES is None:
+            _mu.ALL_PARALLEL_STYLES = frozenset({'colwise', 'rowwise', 'local_colwise', 'local_rowwise'})
         self.model = AutoModelForCausalLM.from_pretrained(
             self.model_name,
             torch_dtype=torch_dtype,
