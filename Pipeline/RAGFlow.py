@@ -16,73 +16,115 @@ from Common.Logger import logger
 from Rerank.Reranking import Reranker
 import typing as T
 from Common.Utils import extract_answer
+from Prompt import get_synthesis_prompts
+
+
 class RAGFlow:
-    def __init__(self, response_synthesizer_llm: LLM | FunctionCallingLLM, template: str, retriever: BaseRetriever, reranker: Reranker):
+    def __init__(
+        self,
+        response_synthesizer_llm: LLM | FunctionCallingLLM,
+        template: str,
+        retriever: BaseRetriever,
+        reranker: Reranker,
+        synthesis_mode: str = "direct",
+        intermediate_length: int = 100,
+    ):
         self.response_synthesizer_llm = response_synthesizer_llm
         self.template = template
         self.retriever = retriever
         self.reranker = reranker
-
-
+        self.synthesis_mode = synthesis_mode
+        self.intermediate_length = intermediate_length
+        self._synthesis_prompts = get_synthesis_prompts()
 
     @property
     def verbose(self):
-        log_level = logger.level
-        if log_level <= 20:
-            return True
-        return False
+        return logger.level <= 20
 
     @property
     def prompt_template(self) -> PromptTemplate:
         if self.template is None:
             raise ValueError("Flow template not set. Cannot create prompt template.")
-        prompt_template = None
-        function_mappings = None
-    
-        logger.debug("Creating prompt template from '%s'", self.template)
-
-        prompt_template = PromptTemplate(
+        return PromptTemplate(
             template=self.template,
             prompt_type=PromptType.QUESTION_ANSWER,
-            function_mappings=function_mappings,
         )
-
-        return prompt_template
 
     @cached_property
     def query_engine(self) -> BaseQueryEngine:
-
-        retriever = RetrieverQueryEngine(
-            retriever=self.retriever)
-      
-        return retriever
-
-    def get_prompt(self, query) -> str:
-        if self.template is None:
-            return query
-
-        if self.get_examples is None:
-            return self.template.format(query_str=query)
-
-        examples = self.get_examples(query)
-        assert examples, "No examples found for few-shot prompting"
-
-        return self.template.format(
-            query_str=query,
-            few_shot_examples=examples,
-        )
+        return RetrieverQueryEngine(retriever=self.retriever)
 
     def retrieve(self, query: str) -> T.List[NodeWithScore]:
-        return self.retriever.retrieve(QueryBundle(query))  
+        return self.retriever.retrieve(QueryBundle(query))
 
-    def query(self, query: str) -> str:
-        # Generate response
-        retrieved_nodes = self.retrieve(query)
-        reranked_nodes = self.reranker.rerank(retrieved_nodes, query)
-        context = "\n".join([node.text for node in reranked_nodes])
+    def _synthesize_direct(self, query: str, nodes: T.List[NodeWithScore]) -> str:
+        context = "\n".join([node.text for node in nodes])
         instruction = self.prompt_template.format(query=query, context=context)
         response = self.response_synthesizer_llm.ask(msg=instruction)
-        response = extract_answer(response)
-        return response
+        return extract_answer(response)
 
+    def _synthesize_map_reduce(self, query: str, nodes: T.List[NodeWithScore]) -> str:
+        map_tmpl = self._synthesis_prompts['map']
+        reduce_tmpl = self._synthesis_prompts['reduce']
 
+        partial_answers = []
+        for node in nodes:
+            try:
+                instruction = map_tmpl.format(query=query, context=node.text)
+                answer = self.response_synthesizer_llm.ask(
+                    msg=instruction, max_tokens=self.intermediate_length
+                )
+                partial_answers.append(answer.strip())
+            except Exception as e:
+                logger.warning(f"Map step failed for a chunk: {e}")
+
+        if not partial_answers:
+            return ""
+
+        combined = "\n\n".join(
+            f"Partial answer {i+1}: {a}" for i, a in enumerate(partial_answers)
+        )
+        reduce_instruction = reduce_tmpl.format(query=query, context=combined)
+        response = self.response_synthesizer_llm.ask(msg=reduce_instruction)
+        return extract_answer(response)
+
+    def _synthesize_refine(self, query: str, nodes: T.List[NodeWithScore]) -> str:
+        if not nodes:
+            return ""
+
+        refine_tmpl = self._synthesis_prompts['refine']
+
+        # Bootstrap with first chunk using the main template
+        context = nodes[0].text
+        instruction = self.prompt_template.format(query=query, context=context)
+        current_answer = self.response_synthesizer_llm.ask(
+            msg=instruction, max_tokens=self.intermediate_length
+        )
+
+        # Iteratively refine with remaining chunks
+        for node in nodes[1:]:
+            try:
+                instruction = refine_tmpl.format(
+                    query=query,
+                    existing_answer=current_answer.strip(),
+                    context=node.text,
+                )
+                current_answer = self.response_synthesizer_llm.ask(
+                    msg=instruction, max_tokens=self.intermediate_length
+                )
+            except Exception as e:
+                logger.warning(f"Refine step failed for a chunk: {e}")
+
+        return extract_answer(current_answer)
+
+    def query(self, query: str) -> str:
+        retrieved_nodes = self.retrieve(query)
+        reranked_nodes = self.reranker.rerank(retrieved_nodes, query)
+
+        mode = (self.synthesis_mode or "direct").lower()
+        if mode == "map_reduce":
+            return self._synthesize_map_reduce(query, reranked_nodes)
+        elif mode == "refine":
+            return self._synthesize_refine(query, reranked_nodes)
+        else:
+            return self._synthesize_direct(query, reranked_nodes)

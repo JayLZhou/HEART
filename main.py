@@ -5,6 +5,7 @@ import os
 import random
 import json
 import copy
+import time
 import numpy as np
 import torch
 from pathlib import Path
@@ -158,40 +159,59 @@ def _default_flow_flat_config() -> dict:
 
 
 def _evaluate_full_per_cluster(*, clusters: dict[str, list[dict]], flat_config_by_cluster: dict[str, dict], tag: str):
-    def _eval_cluster(cid: str, qlist: list[dict], flow_cfg: dict) -> dict:
-        flow = builder.build_flow(wrap_params(flow_cfg))
-        correct = 0
-        for i, q in enumerate(qlist, start=1):
-            q_eval = copy.deepcopy(q)
+    # Flat (cluster, query) task pool so all eval_parallel_workers slots stay busy
+    # across the whole full-eval (the old version capped concurrency at #clusters).
+    items = sorted(clusters.items(), key=lambda x: int(x[0]) if str(x[0]).isdigit() else x[0])
+    flows = {}
+    sizes = {}
+    for cid, qlist in items:
+        flow_cfg = flat_config_by_cluster.get(cid) or _default_flow_flat_config()
+        flows[cid] = builder.build_flow(wrap_params(flow_cfg))
+        sizes[cid] = len(qlist)
+
+    tasks = [(cid, q) for cid, qlist in items for q in qlist]
+    correct = {cid: 0 for cid, _ in items}
+    done = {cid: 0 for cid, _ in items}
+    workers = int(getattr(getattr(opt.tuner, "optimization", None), "eval_parallel_workers", 16) or 16)
+    workers = max(1, workers)
+
+    def _eval_one(cid: str, q: dict):
+        # Retry transient errors (e.g. embedding/LLM connection hiccups) so they
+        # do not silently count as wrong answers and bias the per-cluster accuracy.
+        last = None
+        for attempt in range(4):
             try:
-                q_eval["output"] = flow.query(q_eval["question"])
+                q_eval = copy.deepcopy(q)
+                q_eval["output"] = flows[cid].query(q_eval["question"])
                 m = evaluator.evaluate_single(q_eval)
-                correct += 1 if float(m["accuracy"]) >= 50 else 0
+                return cid, (1 if float(m["accuracy"]) >= 50 else 0)
             except Exception as ex:
-                logger.warning(f"[FullEval:{tag}] cluster={cid} query_idx={i} failed: {ex}")
-            if i % 25 == 0:
-                logger.info(f"[FullEval:{tag}] cluster={cid} progress {i}/{len(qlist)}")
-        full_acc = 100.0 * correct / max(1, len(qlist))
-        logger.info(f"[FullEval:{tag}] cluster={cid} acc={full_acc:.2f}% ({correct}/{len(qlist)})")
-        return {
+                last = ex
+                time.sleep(1.0 * (attempt + 1))
+        logger.warning(f"[FullEval:{tag}] cluster={cid} GIVEUP after retries: {last}")
+        return cid, 0
+
+    with ThreadPoolExecutor(max_workers=workers) as ex:
+        futures = [ex.submit(_eval_one, cid, q) for cid, q in tasks]
+        for fut in as_completed(futures):
+            cid, c = fut.result()
+            correct[cid] += c
+            done[cid] += 1
+            if done[cid] % 50 == 0 or done[cid] == sizes[cid]:
+                logger.info(f"[FullEval:{tag}] cluster={cid} progress {done[cid]}/{sizes[cid]}")
+
+    rows = []
+    for cid, _ in items:
+        full_acc = 100.0 * correct[cid] / max(1, sizes[cid])
+        logger.info(f"[FullEval:{tag}] cluster={cid} acc={full_acc:.2f}% ({correct[cid]}/{sizes[cid]})")
+        rows.append({
             "cluster_id": int(cid) if str(cid).isdigit() else cid,
             "tag": tag,
             "trial_id": None,
             "train_acc_sampled": None,
-            "full_eval_n": len(qlist),
+            "full_eval_n": sizes[cid],
             "full_acc": full_acc,
-        }
-
-    rows = []
-    items = sorted(clusters.items(), key=lambda x: int(x[0]) if str(x[0]).isdigit() else x[0])
-    max_workers = max(1, min(5, len(items)))
-    with ThreadPoolExecutor(max_workers=max_workers) as ex:
-        futures = []
-        for cid, qlist in items:
-            flow_cfg = flat_config_by_cluster.get(cid) or _default_flow_flat_config()
-            futures.append(ex.submit(_eval_cluster, cid, qlist, flow_cfg))
-        for fut in as_completed(futures):
-            rows.append(fut.result())
+        })
     return sorted(rows, key=lambda r: r["cluster_id"])
 
 

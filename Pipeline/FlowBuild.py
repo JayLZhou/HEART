@@ -57,6 +57,8 @@ class FlowBuilder(ContextMixin, BaseModel):
             template=template,
             retriever=retriever,
             reranker=reranker,
+            synthesis_mode=params.get('synthesis_mode', 'direct'),
+            intermediate_length=int(params.get('intermediate_length', 100)),
         )
     
 

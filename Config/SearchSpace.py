@@ -48,6 +48,13 @@ class SearchSpace(BaseModel):
         default_factory=FaissSearchSpace,
         description="Search-space configuration for FAISS HNSW parameters.",
     )
+    synthesis_modes: T.List[str] = Field(
+        default_factory=lambda: ["direct", "map_reduce", "refine"],
+        description="Response synthesis strategies.",
+    )
+    intermediate_length_min: int = Field(default=50, description="Min tokens for intermediate answers.")
+    intermediate_length_max: int = Field(default=300, description="Max tokens for intermediate answers.")
+    intermediate_length_step: int = Field(default=50, description="Step for intermediate_length.")
 
     _custom_defaults: dict[str, T.Any] = PrivateAttr(default_factory=dict)
 
@@ -83,7 +90,12 @@ class SearchSpace(BaseModel):
             "response_synthesizer_llm": CategoricalDistribution(
                 self.response_synthesizer_llms
             ),
-          
+            "synthesis_mode": CategoricalDistribution(self.synthesis_modes),
+            "intermediate_length": IntDistribution(
+                self.intermediate_length_min,
+                self.intermediate_length_max,
+                step=self.intermediate_length_step,
+            ),
         }
 
         distributions.update(self.rag_retriever.build_distributions())
