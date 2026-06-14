@@ -84,6 +84,54 @@ class FaissIndex(BaseIndex):
     def _embed_text(self, text: str):
         return self.embedding_model._get_text_embedding(text)
     
+    def _embed_texts_cached(self, texts: list) -> list:
+        """Embed chunk texts, reusing a content-addressed on-disk cache.
+
+        Chunk embeddings depend only on (chunk text, embedding model, dims) -- NOT on
+        the FAISS/HNSW index params. Without this cache, force_rebuild=True re-embeds
+        the whole corpus on every index rebuild (i.e. every tuning trial whose FAISS
+        params differ), which dominates run time. The key hashes the model, dims and
+        all chunk texts, so a cache hit always returns the correct vectors. Override the
+        cache location with the HEART_EMB_CACHE env var.
+        """
+        import hashlib
+        model_name = getattr(self.embedding_model, "model_name", None) or type(self.embedding_model).__name__
+        dims = int(getattr(self.config, "dimensions", 0) or 0)
+        h = hashlib.md5()
+        h.update(f"{model_name}|{dims}|{len(texts)}|".encode("utf-8"))
+        for t in texts:
+            h.update(b"\x00")
+            h.update((t or "").encode("utf-8", "ignore"))
+        key = h.hexdigest()
+
+        cache_dir = os.environ.get("HEART_EMB_CACHE") or os.path.join(
+            os.path.dirname(os.path.abspath(self.config.persist_path)), "..", "chunk_emb_cache")
+        cache_dir = os.path.abspath(cache_dir)
+        cache_file = os.path.join(cache_dir, f"{key}.npy")
+
+        if os.path.exists(cache_file):
+            try:
+                arr = np.load(cache_file)
+                if arr.shape[0] == len(texts):
+                    logger.info(f"Loaded {len(texts)} chunk embeddings from cache: {cache_file}")
+                    return arr.tolist()
+                logger.warning("Embedding cache size mismatch; recomputing")
+            except Exception as e:
+                logger.warning(f"Embedding cache read failed ({e}); recomputing")
+
+        # Batch embedding requests to satisfy provider-side per-request limits.
+        batch_size = int(getattr(self.config, "embed_batch_size", 64) or 64)
+        text_embeddings = []
+        for i in range(0, len(texts), batch_size):
+            text_embeddings.extend(self.embedding_model._get_text_embeddings(texts[i : i + batch_size]))
+        try:
+            os.makedirs(cache_dir, exist_ok=True)
+            np.save(cache_file, np.asarray(text_embeddings, dtype=np.float32))
+            logger.info(f"Cached {len(texts)} chunk embeddings -> {cache_file}")
+        except Exception as e:
+            logger.warning(f"Embedding cache write failed ({e})")
+        return text_embeddings
+
     def _update_index(self, datas: list[dict[str:Any]], meta_data: list):
         def process_document(data):
      
@@ -101,12 +149,9 @@ class FaissIndex(BaseIndex):
         # Generate embeddings with progress bar
         logger.info(f"Generating embeddings for {len(texts)} texts...")
         
-        # Batch embedding requests to satisfy provider-side per-request limits.
-        batch_size = int(getattr(self.config, "embed_batch_size", 64) or 64)
-        text_embeddings = []
-        for i in range(0, len(texts), batch_size):
-            batch = texts[i : i + batch_size]
-            text_embeddings.extend(self.embedding_model._get_text_embeddings(batch))
+        # Content-addressed cache so identical chunks are not re-embedded on every
+        # index rebuild (FAISS/HNSW params do not change the vectors).
+        text_embeddings = self._embed_texts_cached(texts)
 
         vector_store = self._get_vector_store(self.config.dimensions)
         storage_context = StorageContext.from_defaults(vector_store=vector_store)
