@@ -1,4 +1,8 @@
-from modelscope import AutoTokenizer, AutoModel
+# NOTE: `modelscope` is imported lazily inside the 'local' backend below.
+# Importing it at module load monkeypatches transformers' get_class_from_dynamic_module
+# to resolve remote-code models via the ModelScope hub, which 404s for HF-only
+# rerankers (gte-multilingual / jina-reranker-v2). We use the OpenAI (8017) backend,
+# so modelscope is never needed here.
 import openai
 import numpy as np
 import torch
@@ -33,6 +37,7 @@ class TextEmbedding(BaseEmbedding):
         object.__setattr__(self, "batch_size", batch_size)
         
         if self.backend == "local":
+            from modelscope import AutoTokenizer, AutoModel  # lazy: see top-of-file note
             if device == "auto" or (isinstance(device, list) and len(device) > 0 and device[0] == "auto"):
                 device_value = "cuda" if torch.cuda.is_available() else "cpu"
             elif isinstance(device, list) and len(device) > 0:

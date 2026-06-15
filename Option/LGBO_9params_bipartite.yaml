@@ -54,7 +54,7 @@ retriever:
       - reciprocal_rerank
 
 tuner:
-  name: lgbo_1000q_real_5c_1200budget_0609
+  name: lgbo_9params_0613
   reuse_study: false
   recreate_study: true
   optimization:
@@ -72,12 +72,26 @@ tuner:
     cluster_kmeans_k: 5
     cluster_kmeans_random_state: 42
     run_full_eval_before_after: true
-    eval_parallel_workers: 16
+    eval_parallel_workers: 48
   search_space:
+    synthesis_modes:
+      - "direct"
+      - "map_reduce"
+      - "refine"
+    intermediate_length_min: 50
+    intermediate_length_max: 300
+    intermediate_length_step: 50
     reranker:
       choices:
         - "flashrank::ms-marco-TinyBERT-L-2-v2"
+        - "flashrank::ms-marco-MiniLM-L-12-v2"
+        - "qwen_reranker::qwen3-reranker-0.6b"
+        - "transformer_ranker::mxbai-rerank-base"
+        - "transformer_ranker::bge-reranker-v2-m3"
+        - "transformer_ranker::jina-reranker-base-multilingual"
+        - "transformer_ranker::gte-multilingual-reranker-base"
+        - "upr::t5-base"
 
 data_root: /home/jovyan/buckets/HEART/datasets
 working_dir: /home/jovyan/buckets/HEART/runs
-exp_name: lgbo_1000q_real_5c_1200budget_0609
+exp_name: lgbo_9params_bipartite

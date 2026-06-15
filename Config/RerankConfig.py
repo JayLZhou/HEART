@@ -4,7 +4,7 @@ import typing as T
 from Config.SearchSpaceMix import *
 class Reranker(BaseModel, SearchSpaceMixin):
     top_k: TopK = Field(
-        default_factory=lambda: TopK(kmax=128, log=True),
+        default_factory=lambda: TopK(kmax=32, log=True),  # capped at 32: retrieval is <=32 so reranker can't output more
     )
     choices: T.List[str] = Field(
         default_factory=lambda: [

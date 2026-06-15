@@ -23,7 +23,8 @@ HF_PRE_DEFIND_MODELS ={
     },
     'upr':{
         't5-small':'google/t5-small-lm-adapt',
-        't5-base':'google/t5-base-lm-adapt',
+        # t5-base remapped to a local safetensors copy (HF repo ships only .bin; transformers 4.53 + torch 2.4 refuses torch.load per CVE-2025-32434)
+        't5-base':'/home/jovyan/buckets/model/t5-base-lm-adapt-st',
         't5-large':'google/t5-large-lm-adapt',
         't0-3b':'bigscience/T0_3B',
         't0-11b':'bigscience/T0',

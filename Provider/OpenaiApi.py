@@ -73,9 +73,17 @@ class OpenAILLM(BaseLLM):
         return params
 
     async def _achat_completion_stream(self, messages: list[dict], timeout=USE_CONFIG_TIMEOUT, max_tokens = None) -> str:
-        response: AsyncStream[ChatCompletionChunk] = await self.aclient.chat.completions.create(
-            **self._cons_kwargs(messages, timeout=self.get_timeout(timeout), max_tokens = max_tokens), stream=True
-        )
+        # Fresh per-call client bound to the CURRENT event loop (see _achat_completion).
+        client = AsyncOpenAI(**self._make_client_kwargs())
+        try:
+            response: AsyncStream[ChatCompletionChunk] = await client.chat.completions.create(
+                **self._cons_kwargs(messages, timeout=self.get_timeout(timeout), max_tokens = max_tokens), stream=True
+            )
+            return await self._consume_stream(response, messages)
+        finally:
+            await client.close()
+
+    async def _consume_stream(self, response, messages) -> str:
         usage = None
         collected_messages = []
         has_finished = False
@@ -143,7 +151,11 @@ class OpenAILLM(BaseLLM):
     async def _achat_completion(self, messages: list[dict], timeout=USE_CONFIG_TIMEOUT, max_tokens = None) -> ChatCompletion:
         kwargs = self._cons_kwargs(messages, timeout=self.get_timeout(timeout), max_tokens=max_tokens)
 
-        rsp: ChatCompletion = await self.aclient.chat.completions.create(**kwargs)
+        # Fresh per-call client bound to the CURRENT event loop. A single shared
+        # AsyncOpenAI reused across the eval ThreadPoolExecutor's per-thread loops
+        # deadlocks (httpx pool lock binds to the loop that first used it).
+        async with AsyncOpenAI(**self._make_client_kwargs()) as client:
+            rsp: ChatCompletion = await client.chat.completions.create(**kwargs)
         self._update_costs(rsp.usage)
         return rsp
 
@@ -152,7 +164,7 @@ class OpenAILLM(BaseLLM):
 
     @retry(
         wait=wait_random_exponential(min=1, max=10),
-        stop=stop_after_attempt(2),
+        stop=stop_after_attempt(8),
         after=after_log(logger, logger.level("WARNING").name),
         retry=retry_if_exception_type(Exception),
         retry_error_callback=log_and_reraise,

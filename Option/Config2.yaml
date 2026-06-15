@@ -29,9 +29,9 @@ embedding:
   max_token_size: 8102
   embed_batch_size: 64
  
-data_root: /data1/yujia/HEART/HEART/agent_workspace/datasets # Root directory for data
+data_root: /home/jovyan/buckets/HEART/datasets # Root directory for data
 
-working_dir: /data1/yujia/HEART/HEART/agent_workspace/runs # Result directory for the experiment
+working_dir: /home/jovyan/buckets/HEART/runs # Result directory for the experiment
 exp_name: tpebo # Experiment name
 vdb_type: faiss
 faiss_hnsw_m: 32

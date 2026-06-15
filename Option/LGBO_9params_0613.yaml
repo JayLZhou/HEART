@@ -72,7 +72,7 @@ tuner:
     cluster_kmeans_k: 5
     cluster_kmeans_random_state: 42
     run_full_eval_before_after: true
-    eval_parallel_workers: 16
+    eval_parallel_workers: 48
   search_space:
     synthesis_modes:
       - "direct"
@@ -92,6 +92,6 @@ tuner:
         - "transformer_ranker::gte-multilingual-reranker-base"
         - "upr::t5-base"
 
-data_root: /data1/yujia/HEART/HEART/datasets
-working_dir: /data1/yujia/HEART/HEART/agent_workspace/runs
+data_root: /home/jovyan/buckets/HEART/datasets
+working_dir: /home/jovyan/buckets/HEART/runs
 exp_name: lgbo_9params_0613

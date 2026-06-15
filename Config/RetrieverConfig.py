@@ -54,10 +54,10 @@ class QueryDecomposition(BaseModel, SearchSpaceMixin):
         default=2, description="Minimum number of sub-queries to generate."
     )
     num_queries_max: int = Field(
-        default=20, description="Maximum number of sub-queries to generate."
+        default=5, description="Maximum number of sub-queries to generate."
     )
     num_queries_step: int = Field(
-        default=2, description="Step size for the number of sub-queries."
+        default=1, description="Step size for the number of sub-queries."
     )
 
     def defaults(self, prefix: str = "") -> T.Dict[str, T.Any]:
@@ -122,7 +122,7 @@ class Retriever(BaseModel, SearchSpaceMixin):
         default_factory=Hybrid, description="Configuration for hybrid retrieval."
     )
     query_decomposition_enabled: list[bool] = Field(
-        default_factory=lambda: [True, False],
+        default_factory=lambda: [True, False],  # re-enabled; num_queries now capped 2-5 (was 2-20) to avoid context overflow
         description="Whether query decomposition is enabled.",
     )
     query_decomposition: QueryDecomposition = Field(

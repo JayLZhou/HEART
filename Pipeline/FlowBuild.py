@@ -124,15 +124,26 @@ class FlowBuilder(ContextMixin, BaseModel):
                 return
 
             faiss_params = self._effective_faiss_params(params)
-            signature = repr(sorted(faiss_params.items()))
+            # efSearch is a QUERY-TIME knob (applied via FaissIndex._ensure_runtime_search_params)
+            # and does NOT change the HNSW graph. Exclude it from the rebuild signature / persist
+            # path so tuning it never rebuilds the graph; only M / efConstruction / metric
+            # (build-time) define a distinct index.
+            build_params = {k: v for k, v in faiss_params.items() if k != "faiss_hnsw_ef_search"}
+            signature = repr(sorted(build_params.items()))
             if signature == self._dense_index_signature:
+                # Same graph: just refresh the query-time efSearch on the existing index.
+                if self.chunk_vdb is not None:
+                    try:
+                        self.chunk_vdb.config.hnsw_ef_search = int(faiss_params["faiss_hnsw_ef_search"])
+                    except Exception:
+                        pass
                 return
 
             index_config = self.config.model_copy(
                 update=faiss_params,
                 deep=True,
             )
-            persist_path = self._dense_index_persist_path(faiss_params)
+            persist_path = self._dense_index_persist_path(build_params)
             self.chunk_vdb = get_index(get_index_config(index_config, persist_path=persist_path))
             self.chunk_vdb.build_index(self._dense_chunks, [], self.config.force_rebuild)
             self._dense_index_signature = signature

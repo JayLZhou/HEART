@@ -36,7 +36,7 @@ class SearchSpace(BaseModel):
     )
 
     rag_retriever: Retriever = Field(
-        default_factory=lambda: Retriever(top_k=TopK(kmax=128, log=True)),
+        default_factory=lambda: Retriever(top_k=TopK(kmax=32, log=True)),
         description="Configuration for the RAG retriever.",
     )
 
