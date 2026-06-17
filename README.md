@@ -94,9 +94,9 @@ HEART jointly optimizes over:
 - RAG method: dense, sparse, hybrid
 - Top-k retrieval (2-32)
 - Hybrid BM25 weight (0.2-0.8)
-- Query decomposition (enabled/disabled, LLM choice, num queries)
-- FAISS index params (HNSW M, efSearch, efConstruction, metric)
+- Query decomposition: enabled/disabled, LLM choice, num sub-queries (2–5)
+- FAISS **efSearch** (8–256) — the only tuned index param. HNSW M (32), efConstruction (40), and metric (L2) are fixed build-time params, since rebuilding the index every trial is expensive while efSearch is query-time (no rebuild).
 - Reranker choice (flashrank variants, transformer rankers, Qwen3-reranker, UPR-T5)
-- Reranker top-k (2-100)
+- Reranker top-k (2–32, capped to the retrieval top-k)
 
 Response synthesis is **fixed to `direct`** and is no longer tuned: `map_reduce`/`refine` (and their `intermediate_length`) consistently underperformed on multi-hop QA and wasted the small per-cluster budget. The flow falls back to `direct` automatically when these params are absent.
