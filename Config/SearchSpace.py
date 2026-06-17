@@ -85,16 +85,14 @@ class SearchSpace(BaseModel):
             param_names = {"faiss", "reranker"}
         else:
             param_names = set(params)
+        # synthesis_mode + intermediate_length are intentionally NOT tuned:
+        # direct synthesis dominates on QA (map_reduce/refine lose bridge entities),
+        # and intermediate_length only matters for those modes. The flow falls back to
+        # synthesis_mode='direct' / intermediate_length=100 via .get() in FlowBuild.
         distributions: dict[str, BaseDistribution] = {
             "template_name": CategoricalDistribution(self.template_names),
             "response_synthesizer_llm": CategoricalDistribution(
                 self.response_synthesizer_llms
-            ),
-            "synthesis_mode": CategoricalDistribution(self.synthesis_modes),
-            "intermediate_length": IntDistribution(
-                self.intermediate_length_min,
-                self.intermediate_length_max,
-                step=self.intermediate_length_step,
             ),
         }
 

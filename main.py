@@ -548,7 +548,14 @@ def wrapper_tuning_budget_aware_lgbo():
     # Strictly follow design doc: first round uses uniform allocation (tau -> inf behavior).
     cold_rounds = 1
     gamma = float(opt.tuner.optimization.budget_gamma)
-    rr_ptr = {cid: 0 for cid in cluster_ids}
+    from Tuner.BOTuner.lgbo_components.query_selection import QuerySelector
+    selector = QuerySelector(pi_min=0.02, ucb_c=2.0, hist_window=12, seed=42)  # §6 within-cluster IS selection
+    # Budget-matched ablation: HEART_DISABLE_IS=1 falls back to the round-robin sliding window
+    # (no importance sampling, no HT objective override) so the §6 effect can be isolated.
+    _disable_is = os.environ.get("HEART_DISABLE_IS", "") == "1"
+    _rr_ptr = {cid: 0 for cid in cluster_ids}
+    if _disable_is:
+        logger.info("[BudgetAware-LGBO] HEART_DISABLE_IS=1 -> round-robin within-cluster selection (no §6)")
 
     for t in range(1, T + 1):
         logger.info(f"[BudgetAware-LGBO] Round {t}/{T}")
@@ -672,12 +679,21 @@ def wrapper_tuning_budget_aware_lgbo():
             }
 
             qlist = clusters[cid]
-            selected = []
-            for _ in range(n_queries):
-                selected.append(qlist[rr_ptr[cid] % len(qlist)])
-                rr_ptr[cid] += 1
+            if _disable_is:
+                # Round-robin sliding window over the cluster (no §6): plain-mean objective.
+                selected = [qlist[(_rr_ptr[cid] + i) % len(qlist)] for i in range(min(n_queries, len(qlist)))]
+                _rr_ptr[cid] = (_rr_ptr[cid] + n_queries) % len(qlist)
+                pi_map = None
+            else:
+                # §6: importance-sampling query selection (replaces the round-robin sliding window)
+                selected, pi_map = selector.select(cid, qlist, n_queries)
             try:
-                tuner.run_cluster_trial(cluster_queries=selected, cluster_context=context)
+                _res = tuner.run_cluster_trial(
+                    cluster_queries=selected, cluster_context=context,
+                    query_inclusion_probs=pi_map, cluster_size=len(qlist),
+                )
+                if (not _disable_is) and isinstance(_res, dict) and _res.get("per_query_f"):
+                    selector.update(cid, _res["per_query_f"])   # §6.7 closed loop: feed f_q back to sigma_q/n_q
             except Exception as e:
                 logger.error(f"Cluster {cid} round-trial failed with error: {str(e)}")
                 raise

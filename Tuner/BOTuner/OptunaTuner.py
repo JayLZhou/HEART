@@ -200,6 +200,8 @@ class OptunaTuner(BasicBOTuner):
         *,
         cluster_queries: list[dict],
         cluster_context: dict | None = None,
+        query_inclusion_probs: dict | None = None,   # §6: {qid: pi_q} for HT label
+        cluster_size: int | None = None,             # §6: M = |D_k| (full cluster)
     ) -> dict:
         """Sample one config and evaluate it on multiple queries from the same cluster.
 
@@ -231,7 +233,10 @@ class OptunaTuner(BasicBOTuner):
                 q_eval = copy.deepcopy(q)
                 response = flow.query(q_eval["question"])
                 q_eval["output"] = response
-                return self.evaluator.evaluate_single(q_eval)
+                row = self.evaluator.evaluate_single(q_eval)
+                if isinstance(row, dict):
+                    row["__qid"] = q_eval.get("id")   # §6: tag for HT weighting
+                return row
 
             if eval_workers <= 1:
                 for q in cluster_queries:
@@ -299,8 +304,21 @@ class OptunaTuner(BasicBOTuner):
             self._tuner.tell(trial, state=TrialState.FAIL)
             return aggregated
 
+        per_query_f: dict = {}
         if metric_rows:
             aggregated = self._aggregate_metrics(metric_rows)
+            # §6: per-query objective values + Horvitz-Thompson (unbiased) cluster estimate.
+            obj_name = self.config.tuner.optimization.objective_1_name
+            per_query_f = {
+                r.get("__qid"): float(r.get(obj_name, 0.0))
+                for r in metric_rows if isinstance(r, dict) and r.get("__qid") is not None
+            }
+            if query_inclusion_probs and cluster_size:
+                from Tuner.BOTuner.lgbo_components.query_selection import ht_estimate
+                _sn = bool(getattr(self.config.tuner.optimization, "query_is_self_normalized", False))
+                aggregated[obj_name] = ht_estimate(
+                    per_query_f, query_inclusion_probs, int(cluster_size), self_normalized=_sn
+                )
         else:
             aggregated = {
                 "failed": True,
@@ -320,6 +338,7 @@ class OptunaTuner(BasicBOTuner):
             flow_json=json.dumps(params),
             query=rep_query,
         )
+        aggregated["per_query_f"] = per_query_f   # §6: feed back to QuerySelector (sigma_q, n_q)
 
         if not metric_rows:
             self._tuner.tell(trial, state=TrialState.FAIL)
